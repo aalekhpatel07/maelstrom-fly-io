@@ -1,6 +1,5 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -21,9 +20,7 @@ pub enum Request {
         topology: HashMap<String, Vec<String>>,
     },
     #[serde(rename = "internal")]
-    Internal {
-        request: InternalRequest,
-    },
+    Internal { request: InternalRequest },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,9 +39,7 @@ pub enum Response {
     Topology { in_reply_to: usize },
 
     #[serde(rename = "internal")]
-    Internal {
-        response: InternalResponse,
-    },
+    Internal { response: InternalResponse },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,7 +52,7 @@ pub enum InternalRequest {
     Add {
         value: usize,
         remaining_nodes: Vec<String>,
-    }
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,7 +61,5 @@ pub enum InternalResponse {
     /// This is what our peers will respond with if they're good friends with us.
     /// "Oh hey fellow node. I've added the value to my set of messages and forwarded the message to the given nodes."
     #[serde(rename = "add_ok")]
-    AddOk {
-        forwarded_to: Vec<String>
-    },
+    AddOk { forwarded_to: Vec<String> },
 }

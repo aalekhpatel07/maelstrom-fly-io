@@ -1,16 +1,12 @@
+use broadcast::{Request, Response};
 use maelstrom_common::{run, Actor, Envelope};
-use broadcast::{
-    Request, 
-    Response,
-};
 use std::collections::HashSet;
-
 
 #[derive(Debug, Default)]
 pub struct Broadcast {
     pub node_id: Option<String>,
     pub neighbors: Vec<String>,
-    
+
     // The order is not important.
     pub messages: HashSet<usize>,
 }
@@ -78,7 +74,7 @@ impl Actor for Broadcast {
                     dest: msg.src,
                     body,
                 })
-            },
+            }
             _ => {
                 unreachable!(
                     "Single node set up doesn't expect to receive 
