@@ -28,6 +28,12 @@ IMPLEMENTED_CHALLENGES = {1: "Echo", 2: "Unique ID Generation", 3: "Broadcast"}
 CHALLENGE_WORKLOADS = {1: "echo", 2: "unique-ids", 3: "broadcast"}
 
 
+CHALLENGE_COMMANDS = {
+    1: "./maelstrom test -w echo --bin solutions/01-echo --time-limit 5",
+    2: "./maelstrom test -w unique-ids --bin solutions/02-unique-id-generation --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition",
+    3: "./maelstrom test -w broadcast --bin solutions/03-broadcast --node-count 1 --time-limit 20 --rate 10"
+}
+
 def parse_args():
     parser = argparse.ArgumentParser(prog="MaelstromInvoker", description=DESCRIPTION)
     parser.add_argument(
@@ -94,7 +100,7 @@ def run_test(challenge: int, time_limit: int):
         is_challenge = file_name.startswith(f"{challenge:02d}")
 
         if is_file and is_executable and is_challenge:
-            command = f"./maelstrom test -w {CHALLENGE_WORKLOADS[challenge]} --bin solutions/{file_name} --time-limit {time_limit:01d}"
+            command = CHALLENGE_COMMANDS[challenge]
             break
 
     if command is None:

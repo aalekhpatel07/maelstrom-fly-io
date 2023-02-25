@@ -3,6 +3,14 @@
 version = 3
 
 [[package]]
+name = "broadcast"
+version = "0.1.0"
+dependencies = [
+ "maelstrom-common",
+ "serde",
+]
+
+[[package]]
 name = "echo"
 version = "0.1.0"
 dependencies = [
