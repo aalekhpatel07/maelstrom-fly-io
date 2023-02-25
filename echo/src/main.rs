@@ -1,29 +1,41 @@
 use maelstrom_common::{
     Actor, 
     Envelope,
-    formatted_log, 
-    merge,
     run
 };
-use serde_json::Value;
+use serde::{Serialize, Deserialize};
 
-macro_rules! init_log {
-    ($($msg: expr),*) => {
-        formatted_log!("INIT", $($msg),*);
-    };
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum Request {
+    #[serde(rename = "init")]
+    Init {
+        msg_id: usize,
+        node_id: String,
+    },
+    #[serde(rename = "echo")]
+    Echo {
+        echo: String,
+        msg_id: usize
+    }
 }
 
-macro_rules! echo_log {
-    ($($msg: expr),*) => {
-        formatted_log!("ECHO", $($msg),*);
-    };
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum Response {
+    #[serde(rename = "init_ok")]
+    InitOk {
+        in_reply_to: usize,
+    },
+    #[serde(rename = "echo_ok")]
+    EchoOk {
+        echo: String,
+        in_reply_to: usize
+    }
 }
 
-macro_rules! state_log {
-    ($($msg: expr),*) => {
-        formatted_log!("STATE", $($msg),*);
-    };
-}
 
 #[derive(Debug, Default)]
 pub struct Echo {
@@ -33,41 +45,30 @@ pub struct Echo {
 
 
 impl Actor for Echo {
-    type InboundMessage = Value;
-    type OutboundMessage = Value;
+    type InboundMessage = Request;
+    type OutboundMessage = Response;
     
     fn handle_message(&mut self, msg: Envelope<Self::InboundMessage>) -> Option<Envelope<Self::OutboundMessage>> {
-        let mut payload = msg.body;
-        
-        let msg_id = payload.get("msg_id").unwrap().as_u64().unwrap();
-        let r#type = payload.get("type").unwrap().as_str().unwrap();
 
-        // It sucks that these messages are so loosely typed. :sadcat:
-        let augment_with = match r#type {
-            "init" => {
-                let node_id = payload.get("node_id").unwrap().as_str().unwrap();
-                self.node_id = Some(node_id.to_string());
-                init_log!("Initialized node: {}", node_id);
-
-                serde_json::json!({
-                    "type": "init_ok",
-                    "in_reply_to": msg_id
-                })
+        Some(match msg.body {
+            Request::Init { msg_id, node_id } => {
+                self.node_id = Some(node_id.clone());
+                eprintln!("[INIT] Initialized node: {}", node_id);
+                Envelope {
+                    body: Response::InitOk { in_reply_to: msg_id },
+                    src: msg.dest,
+                    dest: msg.src
+                }
             },
-            "echo" => {
-                echo_log!("Echoing back: {}", payload.get("echo").unwrap().as_str().unwrap());
-                serde_json::json!({
-                    "type": "echo_ok",
-                    "in_reply_to": msg_id
-                })
+            Request::Echo { echo, msg_id } => {
+                eprintln!("[ECHO] Echoing back: {}, in reply to: {}", echo, msg_id);
+                Envelope {
+                    src: msg.dest,
+                    dest: msg.src,
+                    body: Response::EchoOk { echo, in_reply_to: msg_id }
+                }
             },
-            _ => {
-                panic!("Unknown message type: {}", r#type);
-            }
-        };
-        state_log!("{:#?}", self);
-        merge(&mut payload, &augment_with);
-        Some(Envelope::new(msg.dest, msg.src, payload))
+        })
     }
 }
 

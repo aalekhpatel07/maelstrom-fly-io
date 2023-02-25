@@ -59,7 +59,6 @@
 //! 
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use serde_json::Value;
 use std::io;
 use std::sync::mpsc::channel;
 use std::thread::spawn;
@@ -110,49 +109,6 @@ macro_rules! proc_log {
     ($($msg: expr),*) => {
         formatted_log!("COMPUTE", $($msg),*);
     };
-}
-
-
-/// Merge two JSON objects.
-/// 
-/// 
-/// **Note**: If the `payload` object has a key that is also present in the `augment_with` object, the value
-/// corresponding to that key in the `payload` object will be overwritten.
-/// 
-/// ## Example
-/// 
-/// ```
-/// use serde_json::json;
-/// use maelstrom_common::merge;
-/// 
-/// let mut payload = json!({
-///    "foo": "bar",
-///    "bar": "baz"
-/// });
-/// 
-/// let augment_with = json!({
-///    "baz": "qux",
-///    "bar": "quux"
-/// });
-/// 
-/// merge(&mut payload, &augment_with);
-/// 
-/// assert_eq!(payload, json!({
-///   "foo": "bar",
-///   "baz": "qux",
-///   "bar": "quux"
-/// }));
-/// ```
-pub fn merge<'payload, 'augment>(
-    payload: &'payload mut Value, 
-    augment_with: &'augment Value
-) -> &'payload Value {
-    let payload_as_object = payload.as_object_mut().unwrap();
-
-    for (k, v) in augment_with.as_object().unwrap() {
-        payload_as_object.insert(k.clone(), v.clone());
-    }
-    payload
 }
 
 
@@ -233,33 +189,4 @@ where
             }
         }
     }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_merge() {
-        let mut payload = json!({
-            "foo": "bar",
-            "bar": "baz"
-        });
-
-        let augment_with = json!({
-            "baz": "qux",
-            "bar": "quux"
-        });
-
-        merge(&mut payload, &augment_with);
-
-        assert_eq!(payload, json!({
-            "foo": "bar",
-            "baz": "qux",
-            "bar": "quux"
-        }));
-    }
-
 }
