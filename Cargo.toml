@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "maelstrom-common",
-    "echo"
+    "echo",
+    "unique-id-generation"
 ]
