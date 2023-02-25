@@ -95,7 +95,7 @@
 //!
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::io;
+use std::io::{self, StdinLock};
 use std::sync::mpsc::channel;
 use std::thread::spawn;
 
@@ -162,6 +162,16 @@ pub trait Actor {
         &mut self,
         msg: Envelope<Self::InboundMessage>,
     ) -> Option<Envelope<Self::OutboundMessage>>;
+
+    fn send_message(
+        &self,
+        msg: Envelope<Self::InboundMessage>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let serialized = serde_json::to_string(&msg).expect("to be able to serialize message");
+        out_log!("[INTERNAL] Serialized outbound: {}", serialized);
+        println!("{}", serialized);
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

@@ -5,7 +5,15 @@ edition = "2021"
 
 
 [[bin]]
-name = "03-broadcast"
+name = "03a-broadcast-single-node"
+path = "src/bin/single-node.rs"
+
+[[bin]]
+name = "03b-broadcast-multi-node"
+path = "src/bin/multi-node.rs"
+
+[[bin]]
+name = "03c-broadcast-fault-tolerant"
 path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

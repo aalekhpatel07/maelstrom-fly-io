@@ -12,26 +12,33 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("MaelstromInvoker")
 
 
-DESCRIPTION = """
+DESCRIPTION = '''
 Run the maelstrom tests for a given fly.io dist-sys challenge.
 
 Currently, the following challenges are implemented:
 
-    01: Echo
-    02: Unique ID Generation
-    03: Broadcast
+- 01: Echo
+- 02: Unique ID Generation
+- 03a: Broadcast (Single Node)
+- 03b: Broadcast (Multi-Node)
 
-"""
+'''
 
-IMPLEMENTED_CHALLENGES = {1: "Echo", 2: "Unique ID Generation", 3: "Broadcast"}
 
-CHALLENGE_WORKLOADS = {1: "echo", 2: "unique-ids", 3: "broadcast"}
-
+IMPLEMENTED_CHALLENGES = {
+    "1": "Echo", 
+    "2": "Unique ID Generation", 
+    "3a": "Broadcast (Single Node)",
+    "3b": "Broadcast (Multi-Node)",
+    # "3c": "Broadcast (Fault Tolerant)"
+}
 
 CHALLENGE_COMMANDS = {
-    1: "./maelstrom test -w echo --bin solutions/01-echo --time-limit 5",
-    2: "./maelstrom test -w unique-ids --bin solutions/02-unique-id-generation --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition",
-    3: "./maelstrom test -w broadcast --bin solutions/03-broadcast --node-count 1 --time-limit 20 --rate 10"
+    "1": "./maelstrom test -w echo --bin solutions/01-echo --time-limit 5",
+    "2": "./maelstrom test -w unique-ids --bin solutions/02-unique-id-generation --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition",
+    "3a": "./maelstrom test -w broadcast --bin solutions/03a-broadcast-single-node --node-count 1 --time-limit 20 --rate 10",
+    "3b": "./maelstrom test -w broadcast --bin solutions/03b-broadcast-multi-node --node-count 5 --time-limit 20 --rate 10",
+    # "3c": "./maelstrom test -w broadcast --bin solutions/03c-broadcast-fault-tolerant --node-count 5 --time-limit 20 --rate 10 --nemesis partition",
 }
 
 def parse_args():
@@ -40,18 +47,12 @@ def parse_args():
         "challenge",
         metavar="CHALLENGE_ID",
         nargs="+",
-        type=int,
+        type=str,
         help="The ids of the challenges to run.",
     )
 
-    parser.add_argument(
-        "--time-limit",
-        type=int,
-        help="The time limit to delegate to maelstrom.",
-        default=5,
-    )
-
     args = parser.parse_args()
+
     if any(
         challenge_id not in IMPLEMENTED_CHALLENGES for challenge_id in args.challenge
     ):
@@ -65,7 +66,7 @@ def build_binaries():
     return subprocess.run(["cargo", "build", "--release"], check=True)
 
 
-def copy_binaries_to_maelstrom_solutions(challenges: typing.List[int]):
+def copy_binaries_to_maelstrom_solutions():
     """Copy over the generated Rust binaries to maelstrom's solutions directory."""
 
     SRC_DIR = "target/release"
@@ -73,45 +74,28 @@ def copy_binaries_to_maelstrom_solutions(challenges: typing.List[int]):
 
     for file_path in os.listdir(SRC_DIR):
         src_file_path = os.path.join(SRC_DIR, file_path)
+        # Copy over all the executables.
 
-        # Copy over the executables.
         if os.path.isfile(src_file_path) and os.access(src_file_path, os.X_OK):
-            if not any(
-                file_path.startswith(f"{challenge_id:02d}")
-                for challenge_id in challenges
-            ):
-                continue
             dest_file_path = os.path.join(DEST_DIR, file_path)
             shutil.copy(src_file_path, dest_file_path)
             logging.debug("Copied %s to %s", src_file_path, dest_file_path)
 
 
-def run_test(challenge: int, time_limit: int):
+def run_test(challenge: str):
     """Run maelstrom for a given challenge."""
 
-    command = None
-    BIN_DIR = "maelstrom/solutions"
-
-    for file_path in os.listdir(BIN_DIR):
-        file_name = file_path
-        file_path = os.path.join(BIN_DIR, file_path)
-        is_file = os.path.isfile(file_path)
-        is_executable = os.access(file_path, os.X_OK)
-        is_challenge = file_name.startswith(f"{challenge:02d}")
-
-        if is_file and is_executable and is_challenge:
-            command = CHALLENGE_COMMANDS[challenge]
-            break
+    command = CHALLENGE_COMMANDS.get(challenge, None)
 
     if command is None:
         raise ValueError(f"Couldn't find a test for challenge: {str(challenge)}")
 
     logger.info(
-        'Running maelstrom test workload %s for challenge "%s" (id: %s)',
-        CHALLENGE_WORKLOADS[challenge],
+        'Running maelstrom test for challenge "%s" (id: %s)',
         IMPLEMENTED_CHALLENGES[challenge],
         challenge,
     )
+
     result = subprocess.run(shlex.split(command), check=True, cwd="maelstrom")
     return result
 
@@ -120,9 +104,9 @@ def main():
     args = parse_args()
     logger.info("Arguments: %s", args)
     build_binaries()
-    copy_binaries_to_maelstrom_solutions(args.challenge)
+    copy_binaries_to_maelstrom_solutions()
     for challenge_id in args.challenge:
-        run_test(challenge_id, args.time_limit)
+        run_test(challenge_id)
 
 
 if __name__ == "__main__":
