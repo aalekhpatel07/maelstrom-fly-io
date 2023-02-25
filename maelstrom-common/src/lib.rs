@@ -113,6 +113,13 @@ where
     pub fn new(src: String, dest: String, body: B) -> Self {
         Envelope { src, dest, body }
     }
+    pub fn reply<T>(&self, body: T) -> Envelope<T> {
+        Envelope {
+            src: self.dest.clone(),
+            dest: self.src.clone(),
+            body,
+        }
+    }
 }
 
 #[macro_export]

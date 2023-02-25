@@ -1,5 +1,5 @@
 use broadcast::{Request, Response};
-use maelstrom_common::{run, Actor, Envelope};
+use maelstrom_common::{run, Actor};
 use std::collections::HashSet;
 
 #[derive(Debug, Default)]
@@ -19,61 +19,30 @@ impl Actor for Broadcast {
         &mut self,
         msg: maelstrom_common::Envelope<Self::InboundMessage>,
     ) -> Option<maelstrom_common::Envelope<Self::OutboundMessage>> {
-        match msg.body {
+        Some(match msg.body {
             Request::Init {
                 msg_id,
-                node_id,
-                node_ids,
+                ref node_id,
+                ref node_ids,
             } => {
-                self.node_id = Some(node_id);
-                self.neighbors = node_ids;
-                let body = Response::InitOk {
-                    in_reply_to: msg_id,
-                };
-                Some(Envelope {
-                    src: msg.dest,
-                    dest: msg.src,
-                    body,
-                })
+                self.node_id = Some(node_id.clone());
+                self.neighbors = node_ids.clone();
+                msg.reply(Response::InitOk { in_reply_to: msg_id })
             }
-            Request::Topology { msg_id, topology } => {
+            Request::Topology { msg_id, ref topology } => {
                 let node_id = self.node_id.clone().unwrap();
                 self.neighbors = topology
                     .get(&node_id)
                     .expect("to find a set of neighbors for us.")
                     .clone();
-
-                let body = Response::Topology {
-                    in_reply_to: msg_id,
-                };
-
-                Some(Envelope {
-                    src: msg.dest,
-                    dest: msg.src,
-                    body,
-                })
+                msg.reply(Response::Topology { in_reply_to: msg_id })
             }
             Request::Broadcast { msg_id, message } => {
                 self.messages.insert(message);
-                let body = Response::BroadcastOk {
-                    in_reply_to: msg_id,
-                };
-                Some(Envelope {
-                    src: msg.dest,
-                    dest: msg.src,
-                    body,
-                })
-            }
+                msg.reply(Response::BroadcastOk { in_reply_to: msg_id })
+            },
             Request::Read { msg_id } => {
-                let body = Response::Read {
-                    in_reply_to: msg_id,
-                    messages: self.messages.clone().into_iter().collect::<Vec<_>>(),
-                };
-                Some(Envelope {
-                    src: msg.dest,
-                    dest: msg.src,
-                    body,
-                })
+                msg.reply(Response::Read { in_reply_to: msg_id, messages: self.messages.clone().into_iter().collect::<Vec<_>>() })
             }
             _ => {
                 unreachable!(
@@ -81,7 +50,7 @@ impl Actor for Broadcast {
                     any internal communication from other nodes."
                 )
             }
-        }
+        })
     }
 }
 

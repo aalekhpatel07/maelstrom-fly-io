@@ -39,18 +39,12 @@ impl Actor for UniqueUuid {
     ) -> Option<Envelope<Self::OutboundMessage>> {
         Some(match msg.body {
             Request::Init {
-                msg_id, node_id, ..
+                msg_id, ref node_id, ..
             } => {
                 self.node_id = Some(node_id.clone());
                 formatted_log!("INIT", "Initialized node with id: {}", node_id);
 
-                Envelope {
-                    body: Response::InitOk {
-                        in_reply_to: msg_id,
-                    },
-                    src: msg.dest,
-                    dest: msg.src,
-                }
+                msg.reply(Response::InitOk { in_reply_to: msg_id })
             }
             Request::Generate { msg_id } => {
                 let counter = self
@@ -61,15 +55,13 @@ impl Actor for UniqueUuid {
                 let id = format!("{}-{}", self.node_id.as_ref().unwrap(), counter);
 
                 formatted_log!("GENERATE", "Generated id: {}", id);
-
-                Envelope {
-                    body: Response::GenerateOk {
+                
+                msg.reply(
+                    Response::GenerateOk {
                         id,
                         in_reply_to: msg_id,
-                    },
-                    src: msg.dest,
-                    dest: msg.src,
-                }
+                    }
+                )
             }
         })
     }

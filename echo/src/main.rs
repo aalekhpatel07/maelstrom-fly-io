@@ -34,27 +34,16 @@ impl Actor for Echo {
         msg: Envelope<Self::InboundMessage>,
     ) -> Option<Envelope<Self::OutboundMessage>> {
         Some(match msg.body {
-            Request::Init { msg_id, node_id } => {
+            Request::Init { msg_id, ref node_id } => {
                 self.node_id = Some(node_id.clone());
                 eprintln!("[INIT] Initialized node: {}", node_id);
-                Envelope {
-                    body: Response::InitOk {
-                        in_reply_to: msg_id,
-                    },
-                    src: msg.dest,
-                    dest: msg.src,
-                }
+                
+                msg.reply(Response::InitOk { in_reply_to: msg_id })
             }
-            Request::Echo { echo, msg_id } => {
+            Request::Echo { ref echo, msg_id } => {
                 eprintln!("[ECHO] Echoing back: {}, in reply to: {}", echo, msg_id);
-                Envelope {
-                    src: msg.dest,
-                    dest: msg.src,
-                    body: Response::EchoOk {
-                        echo,
-                        in_reply_to: msg_id,
-                    },
-                }
+
+                msg.reply(Response::EchoOk { echo: echo.to_string(), in_reply_to: msg_id })
             }
         })
     }
