@@ -14,7 +14,7 @@ impl Broadcast {
     /// TLDR; Relay a message to each of the specified
     /// nodes, and ask them to relay it to their
     /// neighbors in turn, if they can.
-    /// 
+    ///
     /// Send a message to each neighbor.
     /// For nodes outside our neighborhood, we will
     /// ask our neighbors if they can help forward the message,
@@ -29,7 +29,6 @@ impl Broadcast {
         forward_to: Vec<String>,
         remaining_nodes: Vec<String>,
     ) {
-
         let our_id = self.node_id.clone().unwrap();
 
         forward_to.iter().for_each(|neighbor| {
@@ -189,13 +188,12 @@ impl Actor for Broadcast {
             }
 
             Request::Internal { request } => {
-                self
-                .process_internal_message_request(request)
-                .map(|response| Envelope {
-                    src: msg.dest,
-                    dest: msg.src,
-                    body: response,
-                })
+                self.process_internal_message_request(request)
+                    .map(|response| Envelope {
+                        src: msg.dest,
+                        dest: msg.src,
+                        body: response,
+                    })
             }
         }
     }
