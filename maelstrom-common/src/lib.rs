@@ -1,29 +1,29 @@
 //! [Maelstrom] is a workbench for testing toy implementations of distributed systems.
-//! 
+//!
 //! This crate abstracts away the boilerplate of setting up the stdin/stdout for a node
 //! in a distributed system, and provides a few useful utilities for writing handlers.
-//! 
+//!
 //! This crate is inspired from and primarily written for the [Fly.io Distributed Systems] challenge.
-//! 
+//!
 //! # Usage
-//! 
+//!
 //! To use this crate, you'll need to implement the `Actor` trait. This trait has two associated types,
 //! `InboundMessage` and `OutboundMessage`. These types are used to define the types of messages that
 //! your actor can receive and send, respectively. These types must implement `Clone`, `Serialize`, `DeserializeOwned`,
 //! `Debug`, `Send`, `Sync`, and be `'static`.
-//! 
+//!
 //! ## Example
-//! 
+//!
 //! ```no_run
 //! use maelstrom_common::{Actor, Envelope};
 //! use serde_json::Value;
-//! 
+//!
 //! #[derive(Debug, Default)]
 //! pub struct Echo {
 //!    // Store our ID when a client initializes us.
 //!   node_id: Option<String>
 //! }
-//! 
+//!
 //! #[derive(Debug, Serialize, Deserialize, Clone)]
 //! #[serde(tag = "type")]
 //! pub enum Request {
@@ -52,13 +52,13 @@
 //!        in_reply_to: usize
 //!    }
 //!}
-//! 
+//!
 //! impl Echo {
 //!  pub fn new() -> Self {
 //!     Self::default()
 //!  }
 //! }
-//! 
+//!
 //! impl Actor for Echo {
 //!    type InboundMessage = Request;
 //!    type OutboundMessage = Response;
@@ -87,14 +87,14 @@
 //!    }
 //! }
 //! ```
-//! 
-//! 
+//!
+//!
 //! [Maelstrom]: (https://github.com/jepsen-io/maelstrom)
 //! [Fly.io Distributed Systems]: (https://fly.io/dist-sys/)
-//! 
-//! 
+//!
+//!
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::io;
 use std::sync::mpsc::channel;
 use std::thread::spawn;
@@ -103,19 +103,15 @@ use std::thread::spawn;
 pub struct Envelope<B> {
     pub src: String,
     pub dest: String,
-    pub body: B
+    pub body: B,
 }
 
-impl<B> Envelope<B> 
+impl<B> Envelope<B>
 where
-    B: Clone + Serialize + DeserializeOwned
+    B: Clone + Serialize + DeserializeOwned,
 {
     pub fn new(src: String, dest: String, body: B) -> Self {
-        Envelope {
-            src,
-            dest,
-            body
-        }
+        Envelope { src, dest, body }
     }
 }
 
@@ -147,33 +143,42 @@ macro_rules! proc_log {
     };
 }
 
-
 pub trait Actor {
-    type InboundMessage: Clone + Serialize + DeserializeOwned + core::fmt::Debug + Send + Sync + 'static;
-    type OutboundMessage: Clone + Serialize + DeserializeOwned + core::fmt::Debug + Send + Sync + 'static;
-    fn handle_message(&mut self, msg: Envelope<Self::InboundMessage>) -> Option<Envelope<Self::OutboundMessage>>;
+    type InboundMessage: Clone
+        + Serialize
+        + DeserializeOwned
+        + core::fmt::Debug
+        + Send
+        + Sync
+        + 'static;
+    type OutboundMessage: Clone
+        + Serialize
+        + DeserializeOwned
+        + core::fmt::Debug
+        + Send
+        + Sync
+        + 'static;
+    fn handle_message(
+        &mut self,
+        msg: Envelope<Self::InboundMessage>,
+    ) -> Option<Envelope<Self::OutboundMessage>>;
 }
 
 #[derive(Debug)]
-pub struct Maelstrom<A> 
-{
-    pub actor: A
+pub struct Maelstrom<A> {
+    pub actor: A,
 }
 
-impl<A> Maelstrom<A> 
-{
+impl<A> Maelstrom<A> {
     pub fn new(actor: A) -> Self {
-        Maelstrom {
-            actor
-        }
+        Maelstrom { actor }
     }
 }
-
 
 /// Run the Maelstrom runtime implicitly.
 pub fn run<A>(actor: A) -> Result<(), Box<dyn std::error::Error>>
 where
-    A: Actor
+    A: Actor,
 {
     Maelstrom::new(actor).start()
 }
@@ -182,15 +187,16 @@ impl<A> Maelstrom<A>
 where
     A: Actor,
 {
-    pub fn start(mut self) -> Result<(), Box<dyn std::error::Error>>{
-
+    pub fn start(mut self) -> Result<(), Box<dyn std::error::Error>> {
         let (inbound_msg_tx, inbound_msg_rx) = channel::<Envelope<A::InboundMessage>>();
         let (outbound_msg_tx, outbound_msg_rx) = channel::<Envelope<A::OutboundMessage>>();
 
         spawn(move || {
             let mut buffer = String::new();
             loop {
-                io::stdin().read_line(&mut buffer).expect("Failed to read stdin.");
+                io::stdin()
+                    .read_line(&mut buffer)
+                    .expect("Failed to read stdin.");
                 in_log!("Just read: {}", buffer);
                 let Ok(msg) = serde_json::from_str(&buffer) else {
                     in_log!("Failed to deserialize: {}", buffer);
@@ -202,14 +208,12 @@ where
             }
         });
 
-        spawn(move || {
-            loop {
-                let msg: _ = outbound_msg_rx.recv().unwrap();
-                let msg_str = serde_json::to_string(&msg).unwrap();
-                out_log!("Will write: {}", &msg_str);
-                println!("{}", msg_str);
-                out_log!("Written successfully");
-            }
+        spawn(move || loop {
+            let msg: _ = outbound_msg_rx.recv().unwrap();
+            let msg_str = serde_json::to_string(&msg).unwrap();
+            out_log!("Will write: {}", &msg_str);
+            println!("{}", msg_str);
+            out_log!("Written successfully");
         });
 
         loop {
@@ -219,8 +223,7 @@ where
             if let Some(response) = response {
                 proc_log!("Processed successfully");
                 outbound_msg_tx.send(response).unwrap();
-            }
-            else {
+            } else {
                 proc_log!("Processed but returned None.");
             }
         }
