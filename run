@@ -62,8 +62,12 @@ def parse_args():
     return args
 
 
+def inv(command, check=True, *args, **kwargs):
+    return subprocess.run(shlex.split(command), check=True, *args, **kwargs)
+
+
 def build_binaries():
-    return subprocess.run(["cargo", "build", "--release"], check=True)
+    return inv("cargo build --release")
 
 
 def copy_binaries_to_maelstrom_solutions():
@@ -95,14 +99,31 @@ def run_test(challenge: str):
         IMPLEMENTED_CHALLENGES[challenge],
         challenge,
     )
-
-    result = subprocess.run(shlex.split(command), check=True, cwd="maelstrom")
+    result = inv(command, cwd="maelstrom")
     return result
+
+
+def try_setup_maelstrom():
+    if os.path.exists("./maelstrom") and os.path.isdir("./maelstrom"):
+        logger.debug("Maelstrom directory exists, so we'll assume maelstrom is already set up correctly.")
+        return
+
+    logger.info("Seems like this is the first time we're running tests. Setting up Maelstrom v0.2.2 ...")
+    logger.info("Downloading Maelstrom v0.2.2 to ./maelstrom")
+    inv('curl -L https://github.com/jepsen-io/maelstrom/releases/download/v0.2.2/maelstrom.tar.bz2 -o maelstrom.tar.bz2')
+    inv("tar -xvf maelstrom.tar.bz2", capture_output=True)
+    inv("rm maelstrom.tar.bz2", capture_output=True)
+    inv("mkdir -p maelstrom/solutions", capture_output=True)
+    logger.info(
+        "Downloaded Maelstrom v0.2.2 to ./maelstrom and "
+        "created a ./maelstrom/solutions directory to store our solutions."
+    )
 
 
 def main():
     args = parse_args()
     logger.info("Arguments: %s", args)
+    try_setup_maelstrom()
     build_binaries()
     copy_binaries_to_maelstrom_solutions()
     for challenge_id in args.challenge:
