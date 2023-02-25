@@ -95,7 +95,7 @@
 //!
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::io::{self};
+use std::io;
 use std::sync::mpsc::channel;
 use std::thread::spawn;
 
