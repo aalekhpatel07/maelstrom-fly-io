@@ -4,3 +4,6 @@ members = [
     "echo",
     "unique-id-generation"
 ]
+
+[profile.release]
+lto = "fat"
