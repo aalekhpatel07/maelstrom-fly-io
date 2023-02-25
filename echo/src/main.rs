@@ -1,12 +1,11 @@
-use serde::{Deserialize, Serialize};
 use maelstrom_common::{
     Actor, 
-    Maelstrom, 
-    Message,
-    formatted_log,
+    Envelope,
+    formatted_log, 
+    merge,
+    run
 };
 use serde_json::Value;
-use std::sync::atomic::AtomicUsize;
 
 macro_rules! init_log {
     ($($msg: expr),*) => {
@@ -28,27 +27,17 @@ macro_rules! state_log {
 
 #[derive(Debug, Default)]
 pub struct Echo {
-    // Store a counter for all messages processed.
-    counter: AtomicUsize,
     // Store our ID when a client initializes us.
     node_id: Option<String>
-}
-
-
-impl Echo {
-    pub fn new() -> Self {
-        Self::default()
-    }
 }
 
 
 impl Actor for Echo {
     type InboundMessage = Value;
     type OutboundMessage = Value;
-    fn handle_message(&mut self, msg: Message<Self::InboundMessage>) -> Option<Message<Self::OutboundMessage>> {
-        let payload = msg.body;
-        
-        self.counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    
+    fn handle_message(&mut self, msg: Envelope<Self::InboundMessage>) -> Option<Envelope<Self::OutboundMessage>> {
+        let mut payload = msg.body;
         
         let msg_id = payload.get("msg_id").unwrap().as_u64().unwrap();
         let r#type = payload.get("type").unwrap().as_str().unwrap();
@@ -62,9 +51,6 @@ impl Actor for Echo {
 
                 serde_json::json!({
                     "type": "init_ok",
-                    "msg_id": self.counter.load(
-                        std::sync::atomic::Ordering::Relaxed
-                    ),
                     "in_reply_to": msg_id
                 })
             },
@@ -72,9 +58,6 @@ impl Actor for Echo {
                 echo_log!("Echoing back: {}", payload.get("echo").unwrap().as_str().unwrap());
                 serde_json::json!({
                     "type": "echo_ok",
-                    "msg_id": self.counter.load(
-                        std::sync::atomic::Ordering::Relaxed
-                    ),
                     "in_reply_to": msg_id
                 })
             },
@@ -82,21 +65,14 @@ impl Actor for Echo {
                 panic!("Unknown message type: {}", r#type);
             }
         };
-
-        let mut payload = payload.clone();
-        let payload_as_object = payload.as_object_mut().unwrap();
-
-        for (k, v) in augment_with.as_object().unwrap() {
-            payload_as_object.insert(k.clone(), v.clone());
-        }
-
         state_log!("{:#?}", self);
-
-        Some(Message::new(msg.dest, msg.src, payload))
+        merge(&mut payload, &augment_with);
+        Some(Envelope::new(msg.dest, msg.src, payload))
     }
 }
 
 
-pub fn main() {
-    Maelstrom::new(Echo::new()).start().unwrap();
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
+    run(Echo::default())?;
+    Ok(())
 }
