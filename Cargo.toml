@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "maelstrom-common",
+    "echo"
+]
