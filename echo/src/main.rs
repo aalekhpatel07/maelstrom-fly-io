@@ -1,50 +1,102 @@
 use serde::{Deserialize, Serialize};
-use maelstrom_common::{Actor, Maelstrom, Message};
+use maelstrom_common::{
+    Actor, 
+    Maelstrom, 
+    Message,
+    formatted_log,
+};
+use serde_json::Value;
+use std::sync::atomic::AtomicUsize;
 
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Request {
-    pub r#type: String,
-    pub msg_id: usize,
-    pub echo: String
+macro_rules! init_log {
+    ($($msg: expr),*) => {
+        formatted_log!("INIT", $($msg),*);
+    };
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Response {
-    pub r#type: String,
-    pub msg_id: usize,
-    pub echo: String,
-    pub in_reply_to: usize
+macro_rules! echo_log {
+    ($($msg: expr),*) => {
+        formatted_log!("ECHO", $($msg),*);
+    };
 }
 
+macro_rules! state_log {
+    ($($msg: expr),*) => {
+        formatted_log!("STATE", $($msg),*);
+    };
+}
 
-#[derive(Debug, Clone)]
-pub struct Echo;
+#[derive(Debug, Default)]
+pub struct Echo {
+    // Store a counter for all messages processed.
+    counter: AtomicUsize,
+    // Store our ID when a client initializes us.
+    node_id: Option<String>
+}
+
 
 impl Echo {
     pub fn new() -> Self {
-        Echo
+        Self::default()
     }
 }
 
 
 impl Actor for Echo {
-    type InboundMessage = Request;
-    type OutboundMessage = Response;
+    type InboundMessage = Value;
+    type OutboundMessage = Value;
     fn handle_message(&mut self, msg: Message<Self::InboundMessage>) -> Option<Message<Self::OutboundMessage>> {
-        let Request { msg_id, echo, .. } = msg.body;
-        let response = Response {
-            r#type: "echo_ok".into(),
-            msg_id,
-            echo,
-            in_reply_to: msg_id
+        let payload = msg.body;
+        
+        self.counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        
+        let msg_id = payload.get("msg_id").unwrap().as_u64().unwrap();
+        let r#type = payload.get("type").unwrap().as_str().unwrap();
+
+        // It sucks that these messages are so loosely typed. :sadcat:
+        let augment_with = match r#type {
+            "init" => {
+                let node_id = payload.get("node_id").unwrap().as_str().unwrap();
+                self.node_id = Some(node_id.to_string());
+                init_log!("Initialized node: {}", node_id);
+
+                serde_json::json!({
+                    "type": "init_ok",
+                    "msg_id": self.counter.load(
+                        std::sync::atomic::Ordering::Relaxed
+                    ),
+                    "in_reply_to": msg_id
+                })
+            },
+            "echo" => {
+                echo_log!("Echoing back: {}", payload.get("echo").unwrap().as_str().unwrap());
+                serde_json::json!({
+                    "type": "echo_ok",
+                    "msg_id": self.counter.load(
+                        std::sync::atomic::Ordering::Relaxed
+                    ),
+                    "in_reply_to": msg_id
+                })
+            },
+            _ => {
+                panic!("Unknown message type: {}", r#type);
+            }
         };
-        Some(Message::new(msg.dest, msg.src, response))
+
+        let mut payload = payload.clone();
+        let payload_as_object = payload.as_object_mut().unwrap();
+
+        for (k, v) in augment_with.as_object().unwrap() {
+            payload_as_object.insert(k.clone(), v.clone());
+        }
+
+        state_log!("{:#?}", self);
+
+        Some(Message::new(msg.dest, msg.src, payload))
     }
 }
 
 
-fn main() {
-    let echo_actor = Maelstrom::new(Echo::new());
-    echo_actor.start().unwrap();
+pub fn main() {
+    Maelstrom::new(Echo::new()).start().unwrap();
 }
