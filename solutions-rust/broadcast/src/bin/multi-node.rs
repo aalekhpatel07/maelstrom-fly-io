@@ -58,7 +58,6 @@ impl Actor for Broadcast {
             }
 
             Request::Broadcast { msg_id, message } => {
-                
                 if self.messages.contains(&message) {
                     return Some(Envelope {
                         src: self.node_id.clone().unwrap(),
@@ -71,14 +70,14 @@ impl Actor for Broadcast {
 
                 self.messages.insert(message);
 
-                self
-                .neighbors
-                .iter()
-                .for_each(|neighbour| {
+                self.neighbors.iter().for_each(|neighbour| {
                     if neighbour == &msg.src {
                         return;
                     }
-                    let body = Request::Broadcast { msg_id: None, message };
+                    let body = Request::Broadcast {
+                        msg_id: None,
+                        message,
+                    };
                     let envelope = Envelope {
                         src: self.node_id.clone().unwrap(),
                         dest: neighbour.clone(),

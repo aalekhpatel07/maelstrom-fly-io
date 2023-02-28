@@ -27,23 +27,33 @@ impl Actor for Broadcast {
             } => {
                 self.node_id = Some(node_id.clone());
                 self.neighbors = node_ids.clone();
-                msg.reply(Response::InitOk { in_reply_to: msg_id })
+                msg.reply(Response::InitOk {
+                    in_reply_to: msg_id,
+                })
             }
-            Request::Topology { msg_id, ref topology } => {
+            Request::Topology {
+                msg_id,
+                ref topology,
+            } => {
                 let node_id = self.node_id.clone().unwrap();
                 self.neighbors = topology
                     .get(&node_id)
                     .expect("to find a set of neighbors for us.")
                     .clone();
-                msg.reply(Response::Topology { in_reply_to: msg_id })
+                msg.reply(Response::Topology {
+                    in_reply_to: msg_id,
+                })
             }
             Request::Broadcast { msg_id, message } => {
                 self.messages.insert(message);
-                msg.reply(Response::BroadcastOk { in_reply_to: msg_id })
-            },
-            Request::Read { msg_id } => {
-                msg.reply(Response::Read { in_reply_to: msg_id, messages: self.messages.clone().into_iter().collect::<Vec<_>>() })
+                msg.reply(Response::BroadcastOk {
+                    in_reply_to: msg_id,
+                })
             }
+            Request::Read { msg_id } => msg.reply(Response::Read {
+                in_reply_to: msg_id,
+                messages: self.messages.clone().into_iter().collect::<Vec<_>>(),
+            }),
         })
     }
 }

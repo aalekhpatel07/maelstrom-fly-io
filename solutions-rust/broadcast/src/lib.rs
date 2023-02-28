@@ -11,10 +11,10 @@ pub enum Request {
         node_ids: Vec<String>,
     },
     #[serde(rename = "broadcast")]
-    Broadcast { 
-        #[serde(skip_serializing_if="Option::is_none")]
-        msg_id: Option<usize>, 
-        message: usize 
+    Broadcast {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        msg_id: Option<usize>,
+        message: usize,
     },
     #[serde(rename = "read")]
     Read { msg_id: usize },
@@ -31,9 +31,9 @@ pub enum Response {
     #[serde(rename = "init_ok")]
     InitOk { in_reply_to: usize },
     #[serde(rename = "broadcast_ok")]
-    BroadcastOk { 
-        #[serde(skip_serializing_if="Option::is_none")]
-        in_reply_to: Option<usize>
+    BroadcastOk {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        in_reply_to: Option<usize>,
     },
     #[serde(rename = "read_ok")]
     Read {
@@ -42,5 +42,4 @@ pub enum Response {
     },
     #[serde(rename = "topology_ok")]
     Topology { in_reply_to: usize },
-
 }
