@@ -44,12 +44,6 @@ impl Actor for Broadcast {
             Request::Read { msg_id } => {
                 msg.reply(Response::Read { in_reply_to: msg_id, messages: self.messages.clone().into_iter().collect::<Vec<_>>() })
             }
-            _ => {
-                unreachable!(
-                    "Single node set up doesn't expect to receive 
-                    any internal communication from other nodes."
-                )
-            }
         })
     }
 }
