@@ -176,7 +176,7 @@ pub trait Actor {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let serialized = serde_json::to_string(&msg).expect("to be able to serialize message");
         out_log!("[INTERNAL] Serialized outbound: {}", serialized);
-        println!("{}", serialized);
+        println!("{serialized}");
         Ok(())
     }
 }
@@ -229,7 +229,7 @@ where
             let msg: _ = outbound_msg_rx.recv().unwrap();
             let msg_str = serde_json::to_string(&msg).unwrap();
             out_log!("Will write: {}", &msg_str);
-            println!("{}", msg_str);
+            println!("{msg_str}");
             out_log!("Written successfully");
         });
 

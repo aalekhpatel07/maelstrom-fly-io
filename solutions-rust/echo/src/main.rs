@@ -36,12 +36,12 @@ impl Actor for Echo {
         Some(match msg.body {
             Request::Init { msg_id, ref node_id } => {
                 self.node_id = Some(node_id.clone());
-                eprintln!("[INIT] Initialized node: {}", node_id);
+                eprintln!("[INIT] Initialized node: {node_id}");
                 
                 msg.reply(Response::InitOk { in_reply_to: msg_id })
             }
             Request::Echo { ref echo, msg_id } => {
-                eprintln!("[ECHO] Echoing back: {}, in reply to: {}", echo, msg_id);
+                eprintln!("[ECHO] Echoing back: {echo}, in reply to: {msg_id}");
 
                 msg.reply(Response::EchoOk { echo: echo.to_string(), in_reply_to: msg_id })
             }
