@@ -215,10 +215,7 @@ where
                     .read_line(&mut buffer)
                     .expect("Failed to read stdin.");
                 in_log!("Just read: {}", buffer);
-                let Ok(msg) = serde_json::from_str(&buffer) else {
-                    in_log!("Failed to deserialize: {}", buffer);
-                    continue;
-                };
+                let msg = serde_json::from_str(&buffer).unwrap();
                 inbound_msg_tx.send(msg).unwrap();
                 in_log!("Sent for processing.");
                 buffer.clear();
