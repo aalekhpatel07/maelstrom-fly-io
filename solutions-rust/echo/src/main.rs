@@ -1,4 +1,6 @@
-use maelstrom_common::{run, Actor, Envelope};
+use core::panic;
+
+use maelstrom_common::{run, Actor, Envelope, Message};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -31,19 +33,22 @@ impl Actor for Echo {
 
     fn handle_message(
         &mut self,
-        msg: Envelope<Self::InboundMessage>,
-    ) -> Option<Envelope<Self::OutboundMessage>> {
+        msg: Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>,
+    ) -> Option<Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>> {
         Some(match msg.body {
-            Request::Init { msg_id, ref node_id } => {
+            Message::Inbound(Request::Init { msg_id, ref node_id }) => {
                 self.node_id = Some(node_id.clone());
                 eprintln!("[INIT] Initialized node: {node_id}");
                 
-                msg.reply(Response::InitOk { in_reply_to: msg_id })
+                msg.reply(Message::Outbound(Response::InitOk { in_reply_to: msg_id }))
             }
-            Request::Echo { ref echo, msg_id } => {
+            Message::Inbound(Request::Echo { ref echo, msg_id }) => {
                 eprintln!("[ECHO] Echoing back: {echo}, in reply to: {msg_id}");
 
-                msg.reply(Response::EchoOk { echo: echo.to_string(), in_reply_to: msg_id })
+                msg.reply(Message::Outbound(Response::EchoOk { echo: echo.to_string(), in_reply_to: msg_id }))
+            },
+            _ => {
+                panic!("Unexpected message: {msg:#?}");
             }
         })
     }

@@ -1,5 +1,5 @@
 use broadcast::{Request, Response};
-use maelstrom_common::{run, Actor, Envelope};
+use maelstrom_common::{run, Actor, Envelope, Message};
 use std::collections::HashSet;
 
 #[derive(Debug, Default)]
@@ -16,20 +16,20 @@ impl Actor for Broadcast {
 
     fn handle_message(
         &mut self,
-        msg: maelstrom_common::Envelope<Self::InboundMessage>,
-    ) -> Option<maelstrom_common::Envelope<Self::OutboundMessage>> {
+        msg: maelstrom_common::Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>,
+    ) -> Option<maelstrom_common::Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>> {
         match msg.body {
-            Request::Init {
+            Message::Inbound(Request::Init {
                 msg_id,
                 node_id,
                 node_ids,
-            } => {
+            }) => {
                 self.node_id = Some(node_id);
                 self.all_nodes = Some(node_ids.into_iter().collect());
 
-                let body = Response::InitOk {
+                let body = Message::Outbound(Response::InitOk {
                     in_reply_to: msg_id,
-                };
+                });
 
                 Some(Envelope {
                     src: msg.dest,
@@ -37,7 +37,7 @@ impl Actor for Broadcast {
                     body,
                 })
             }
-            Request::Topology { msg_id, topology } => {
+            Message::Inbound(Request::Topology { msg_id, topology }) => {
                 let node_id = self.node_id.clone().unwrap();
                 self.neighbors = topology
                     .get(&node_id)
@@ -46,9 +46,9 @@ impl Actor for Broadcast {
                     .into_iter()
                     .collect();
 
-                let body = Response::Topology {
+                let body = Message::Outbound(Response::Topology {
                     in_reply_to: msg_id,
-                };
+                });
 
                 Some(Envelope {
                     src: msg.dest,
@@ -57,14 +57,14 @@ impl Actor for Broadcast {
                 })
             }
 
-            Request::Broadcast { msg_id, message } => {
+            Message::Inbound(Request::Broadcast { msg_id, message }) => {
                 if self.messages.contains(&message) {
                     return Some(Envelope {
                         src: self.node_id.clone().unwrap(),
                         dest: msg.src,
-                        body: Response::BroadcastOk {
+                        body: Message::Outbound(Response::BroadcastOk {
                             in_reply_to: msg_id,
-                        },
+                        }),
                     });
                 }
 
@@ -74,11 +74,11 @@ impl Actor for Broadcast {
                     if neighbour == &msg.src {
                         return;
                     }
-                    let body = Request::Broadcast {
+                    let body: Message<Self::InboundMessage, Self::OutboundMessage> = Message::Inbound(Request::Broadcast {
                         msg_id: None,
                         message,
-                    };
-                    let envelope = Envelope {
+                    });
+                    let envelope: Envelope<Message<Self::InboundMessage, Self::OutboundMessage>> = Envelope {
                         src: self.node_id.clone().unwrap(),
                         dest: neighbour.clone(),
                         body,
@@ -89,22 +89,28 @@ impl Actor for Broadcast {
                 Some(Envelope {
                     src: self.node_id.clone().unwrap(),
                     dest: msg.src,
-                    body: Response::BroadcastOk {
+                    body: Message::Outbound(Response::BroadcastOk {
                         in_reply_to: msg_id,
-                    },
+                    }),
                 })
             }
 
-            Request::Read { msg_id } => {
-                let body = Response::Read {
+            Message::Inbound(Request::Read { msg_id }) => {
+                let body = Message::Outbound(Response::Read {
                     in_reply_to: msg_id,
                     messages: self.messages.clone().into_iter().collect::<Vec<_>>(),
-                };
+                });
                 Some(Envelope {
                     src: msg.dest,
                     dest: msg.src,
                     body,
                 })
+            },
+            Message::Outbound(Response::BroadcastOk { .. }) => {
+                None
+            }
+            _ => {
+                panic!("Unexpected message: {:?}", msg);
             }
         }
     }

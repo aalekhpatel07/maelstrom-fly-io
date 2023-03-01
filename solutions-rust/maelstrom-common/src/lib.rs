@@ -150,29 +150,26 @@ macro_rules! proc_log {
     };
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum Message<I, O> {
+    Inbound(I),
+    Outbound(O),
+}
+
 pub trait Actor {
-    type InboundMessage: Clone
-        + Serialize
-        + DeserializeOwned
-        + core::fmt::Debug
-        + Send
-        + Sync
-        + 'static;
-    type OutboundMessage: Clone
-        + Serialize
-        + DeserializeOwned
-        + core::fmt::Debug
-        + Send
-        + Sync
-        + 'static;
+    type InboundMessage: Serialize + DeserializeOwned + Send + Sync + 'static;
+    type OutboundMessage: Serialize + DeserializeOwned + Send + Sync + 'static;    
+
+
     fn handle_message(
         &mut self,
-        msg: Envelope<Self::InboundMessage>,
-    ) -> Option<Envelope<Self::OutboundMessage>>;
+        msg: Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>,
+    ) -> Option<Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>>;
 
     fn send_message(
         &self,
-        msg: Envelope<Self::InboundMessage>,
+        msg: Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let serialized = serde_json::to_string(&msg).expect("to be able to serialize message");
         out_log!("[INTERNAL] Serialized outbound: {}", serialized);
@@ -205,8 +202,8 @@ where
     A: Actor,
 {
     pub fn start(mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let (inbound_msg_tx, inbound_msg_rx) = channel::<Envelope<A::InboundMessage>>();
-        let (outbound_msg_tx, outbound_msg_rx) = channel::<Envelope<A::OutboundMessage>>();
+        let (inbound_msg_tx, inbound_msg_rx) = channel::<Envelope<Message<A::InboundMessage, A::OutboundMessage>>>();
+        let (outbound_msg_tx, outbound_msg_rx) = channel::<Envelope<Message<A::InboundMessage, A::OutboundMessage>>>();
 
         spawn(move || {
             let mut buffer = String::new();
@@ -232,7 +229,6 @@ where
 
         loop {
             let msg: _ = inbound_msg_rx.recv().unwrap();
-            proc_log!("Processing: {:#?}", &msg);
             let response = self.actor.handle_message(msg);
             if let Some(response) = response {
                 proc_log!("Processed successfully");

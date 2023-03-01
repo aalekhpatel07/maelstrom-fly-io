@@ -1,4 +1,4 @@
-use maelstrom_common::{formatted_log, run, Actor, Envelope};
+use maelstrom_common::{formatted_log, run, Actor, Envelope, Message};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicUsize;
 
@@ -35,18 +35,18 @@ impl Actor for UniqueUuid {
     type OutboundMessage = Response;
     fn handle_message(
         &mut self,
-        msg: Envelope<Self::InboundMessage>,
-    ) -> Option<Envelope<Self::OutboundMessage>> {
+        msg: Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>,
+    ) -> Option<Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>> {
         Some(match msg.body {
-            Request::Init {
+            Message::Inbound(Request::Init {
                 msg_id, ref node_id, ..
-            } => {
+            }) => {
                 self.node_id = Some(node_id.clone());
                 formatted_log!("INIT", "Initialized node with id: {}", node_id);
 
-                msg.reply(Response::InitOk { in_reply_to: msg_id })
+                msg.reply(Message::Outbound(Response::InitOk { in_reply_to: msg_id }))
             }
-            Request::Generate { msg_id } => {
+            Message::Inbound(Request::Generate { msg_id }) => {
                 let counter = self
                     .counter
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -57,11 +57,14 @@ impl Actor for UniqueUuid {
                 formatted_log!("GENERATE", "Generated id: {}", id);
                 
                 msg.reply(
-                    Response::GenerateOk {
+                    Message::Outbound(Response::GenerateOk {
                         id,
                         in_reply_to: msg_id,
-                    }
+                    })
                 )
+            },
+            _ => {
+                panic!("Unexpected message: {:?}", msg)
             }
         })
     }
