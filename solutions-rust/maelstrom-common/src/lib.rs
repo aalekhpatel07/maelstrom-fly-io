@@ -8,10 +8,10 @@
 //! # Usage
 //!
 //! To use this crate, you'll create a node that is capable of handling
-//! some rpcs. Define the rpc messages with a serializable `Message` enum 
+//! some rpcs. Define the rpc messages with a serializable `Message` enum
 //! and define any meaningful error type that can stop the maelstrom test early
 //! in case of something going terribly wrong with the node.
-//! 
+//!
 //! The node must implement the [HandleMessage] trait, which requires
 //! a `handle_message` function that takes an [Envelope] and a [Sender] for optionally
 //! sending any messages.
@@ -20,7 +20,7 @@
 //!
 //! Let's create a simple echo node that responds to `init` and `echo` messages.
 //! This also corresponds to the [Echo challenge](https://fly.io/dist-sys/1/) in the [Fly.io Distributed Systems challenge set](https://fly.io/dist-sys/).
-//! 
+//!
 //! ```no_run
 //! use maelstrom_common::{run, HandleMessage, Envelope};
 //! use serde::{Deserialize, Serialize};

@@ -1,4 +1,4 @@
-use maelstrom_common::{run, HandleMessage, Envelope};
+use maelstrom_common::{run, Envelope, HandleMessage};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicUsize;
 use thiserror::Error;
