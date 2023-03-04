@@ -15,79 +15,86 @@
 //! ## Example
 //!
 //! ```no_run
-//! use maelstrom_common::{Actor, Envelope};
-//! use serde_json::Value;
-//!
+//! use maelstrom_common::{run, Actor, Envelope};
+//! use serde::{Deserialize, Serialize};
+//! use thiserror::Error;
+//! 
+//! #[derive(Error, Debug)]
+//! pub enum Error {
+//!     #[error("The Echo challenge does not expect to receive any response kind of message but received: {0}")]
+//!     ReceivedUnexpectedResponseMessage(String)
+//! }
+//! 
+//! 
+//! #[derive(Debug, Serialize, Deserialize)]
+//! #[serde(tag = "type")]
+//! pub enum Message {
+//!     #[serde(rename = "init")]
+//!     Init { 
+//!         #[serde(skip_serializing_if = "Option::is_none")]
+//!         msg_id: Option<usize>,
+//!         node_id: String
+//!     },
+//!     #[serde(rename = "echo")]
+//!     Echo { 
+//!         echo: String, 
+//!         #[serde(skip_serializing_if = "Option::is_none")]
+//!         msg_id: Option<usize> 
+//!     },
+//!     #[serde(rename = "init_ok")]
+//!     InitOk { 
+//!         #[serde(skip_serializing_if = "Option::is_none")]
+//!         in_reply_to: Option<usize>
+//!     },
+//!     #[serde(rename = "echo_ok")]
+//!     EchoOk { 
+//!         echo: String, 
+//!         #[serde(skip_serializing_if = "Option::is_none")]
+//!         in_reply_to: Option<usize>
+//!     },
+//! }
+//! 
 //! #[derive(Debug, Default)]
 //! pub struct Echo {
-//!    // Store our ID when a client initializes us.
-//!   node_id: Option<String>
+//!     // Store our ID when a client initializes us.
+//!     node_id: Option<String>,
 //! }
-//!
-//! #[derive(Debug, Serialize, Deserialize, Clone)]
-//! #[serde(tag = "type")]
-//! pub enum Request {
-//!    #[serde(rename = "init")]
-//!    Init {
-//!        msg_id: usize,
-//!        node_id: String,
-//!    },
-//!    #[serde(rename = "echo")]
-//!    Echo {
-//!        echo: String,
-//!        msg_id: usize
-//!    }
-//!}
-//!
-//!#[derive(Debug, Serialize, Deserialize, Clone)]
-//!#[serde(tag = "type")]
-//!pub enum Response {
-//!    #[serde(rename = "init_ok")]
-//!    InitOk {
-//!        in_reply_to: usize,
-//!    },
-//!    #[serde(rename = "echo_ok")]
-//!    EchoOk {
-//!        echo: String,
-//!        in_reply_to: usize
-//!    }
-//!}
-//!
-//! impl Echo {
-//!  pub fn new() -> Self {
-//!     Self::default()
-//!  }
-//! }
-//!
+//! 
 //! impl Actor for Echo {
-//!    type InboundMessage = Request;
-//!    type OutboundMessage = Response;
-//!    
-//!    fn handle_message(&mut self, msg: Envelope<Self::InboundMessage>) -> Option<Envelope<Self::OutboundMessage>> {
-//!
-//!        Some(match msg.body {
-//!            Request::Init { msg_id, node_id } => {
-//!                self.node_id = Some(node_id.clone());
-//!                eprintln!("[INIT] Initialized node: {}", node_id);
-//!                Envelope {
-//!                    body: Response::InitOk { in_reply_to: msg_id },
-//!                    src: msg.dest,
-//!                    dest: msg.src
-//!                }
-//!            },
-//!            Request::Echo { echo, msg_id } => {
-//!                eprintln!("[ECHO] Echoing back: {}, in reply to: {}", echo, msg_id);
-//!                Envelope {
-//!                    src: msg.dest,
-//!                    dest: msg.src,
-//!                    body: Response::EchoOk { echo, in_reply_to: msg_id }
-//!                }
-//!            },
-//!        })
-//!    }
+//!     type Message = Message;
+//!     type Error = Error;
+//! 
+//!     fn handle_message(
+//!         &mut self,
+//!         msg: Envelope<Self::Message>,
+//!         outbound_msg_tx: std::sync::mpsc::Sender<Envelope<Self::Message>>,
+//!     ) -> Result<(), Self::Error> {
+//!         match msg.body {
+//!             Message::Init { msg_id, ref node_id } => {
+//!                 self.node_id = Some(node_id.clone());
+//!                 outbound_msg_tx.send(
+//!                     msg.reply(Message::InitOk { in_reply_to: msg_id })
+//!                 ).unwrap();
+//!                 Ok(())
+//!             },
+//!             Message::Echo { ref echo, msg_id } => {
+//!                 outbound_msg_tx.send(
+//!                     msg.reply(
+//!                     Message::EchoOk { echo: echo.to_owned(), in_reply_to: msg_id }
+//!                     )
+//!                 ).unwrap();
+//!                 Ok(())
+//!             },
+//!             _ => Err(Error::ReceivedUnexpectedResponseMessage(format!("{:#?}", serde_json::to_string_pretty(&msg))))
+//!         }
+//!     }
+//! }
+//! 
+//! pub fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     run(Echo::default())?;
+//!     Ok(())
 //! }
 //! ```
-//!
 //!
 //! [Maelstrom]: (https://github.com/jepsen-io/maelstrom)
 //! [Fly.io Distributed Systems]: (https://fly.io/dist-sys/)
@@ -98,8 +105,10 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::io;
 use std::sync::mpsc::channel;
 use std::thread::spawn;
+use std::sync::mpsc::Sender;
+use std::io::Write;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Envelope<B> {
     pub src: String,
     pub dest: String,
@@ -108,10 +117,10 @@ pub struct Envelope<B> {
 
 impl<B> Envelope<B>
 where
-    B: Clone + Serialize + DeserializeOwned,
+    B: Serialize + DeserializeOwned,
 {
-    pub fn new(src: String, dest: String, body: B) -> Self {
-        Envelope { src, dest, body }
+    pub fn new(src: &str, dest: &str, body: B) -> Self {
+        Envelope { src: src.to_owned(), dest: dest.to_owned(), body }
     }
     pub fn reply<T>(&self, body: T) -> Envelope<T> {
         Envelope {
@@ -122,60 +131,15 @@ where
     }
 }
 
-#[macro_export]
-macro_rules! formatted_log {
-    ($prefix: expr, $($msg: expr),*) => {
-        eprintln!("{}: {}", format!("{}", $prefix), format!($($msg),*));
-    };
-}
-
-#[macro_export]
-macro_rules! in_log {
-    ($($msg: expr),*) => {
-        formatted_log!("IN", $($msg),*);
-    };
-}
-
-#[macro_export]
-macro_rules! out_log {
-    ($($msg: expr),*) => {
-        formatted_log!("OUT", $($msg),*);
-    };
-}
-
-#[macro_export]
-macro_rules! proc_log {
-    ($($msg: expr),*) => {
-        formatted_log!("COMPUTE", $($msg),*);
-    };
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum Message<I, O> {
-    Inbound(I),
-    Outbound(O),
-}
-
 pub trait Actor {
-    type InboundMessage: Serialize + DeserializeOwned + Send + Sync + 'static;
-    type OutboundMessage: Serialize + DeserializeOwned + Send + Sync + 'static;    
-
+    type Message: Serialize + DeserializeOwned + Send + Sync + 'static;
+    type Error: std::error::Error + 'static;
 
     fn handle_message(
         &mut self,
-        msg: Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>,
-    ) -> Option<Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>>;
-
-    fn send_message(
-        &self,
-        msg: Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let serialized = serde_json::to_string(&msg).expect("to be able to serialize message");
-        out_log!("[INTERNAL] Serialized outbound: {}", serialized);
-        println!("{serialized}");
-        Ok(())
-    }
+        msg: Envelope<Self::Message>,
+        outbound_msg_tx: Sender<Envelope<Self::Message>>
+    ) -> Result<(), Self::Error>;
 }
 
 #[derive(Debug)]
@@ -202,8 +166,8 @@ where
     A: Actor,
 {
     pub fn start(mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let (inbound_msg_tx, inbound_msg_rx) = channel::<Envelope<Message<A::InboundMessage, A::OutboundMessage>>>();
-        let (outbound_msg_tx, outbound_msg_rx) = channel::<Envelope<Message<A::InboundMessage, A::OutboundMessage>>>();
+        let (inbound_msg_tx, inbound_msg_rx) = channel();
+        let (outbound_msg_tx, outbound_msg_rx) = channel();
 
         spawn(move || {
             let mut buffer = String::new();
@@ -211,31 +175,24 @@ where
                 io::stdin()
                     .read_line(&mut buffer)
                     .expect("Failed to read stdin.");
-                in_log!("Just read: {}", buffer);
                 let msg = serde_json::from_str(&buffer).unwrap();
                 inbound_msg_tx.send(msg).unwrap();
-                in_log!("Sent for processing.");
                 buffer.clear();
             }
         });
 
-        spawn(move || loop {
-            let msg: _ = outbound_msg_rx.recv().unwrap();
-            let msg_str = serde_json::to_string(&msg).unwrap();
-            out_log!("Will write: {}", &msg_str);
-            println!("{msg_str}");
-            out_log!("Written successfully");
+        spawn(move || {
+            let mut stdout = io::stdout().lock();
+            loop {
+                let msg: _ = outbound_msg_rx.recv().unwrap();
+                let msg_str = serde_json::to_string(&msg).unwrap();
+                writeln!(stdout, "{}", msg_str).unwrap();
+            }
         });
 
         loop {
             let msg: _ = inbound_msg_rx.recv().unwrap();
-            let response = self.actor.handle_message(msg);
-            if let Some(response) = response {
-                proc_log!("Processed successfully");
-                outbound_msg_tx.send(response).unwrap();
-            } else {
-                proc_log!("Processed but returned None.");
-            }
+            self.actor.handle_message(msg, outbound_msg_tx.clone())?;
         }
     }
 }

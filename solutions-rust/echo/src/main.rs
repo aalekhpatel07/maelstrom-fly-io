@@ -1,24 +1,40 @@
-use core::panic;
-
-use maelstrom_common::{run, Actor, Envelope, Message};
+use maelstrom_common::{run, Actor, Envelope};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "type")]
-pub enum Request {
-    #[serde(rename = "init")]
-    Init { msg_id: usize, node_id: String },
-    #[serde(rename = "echo")]
-    Echo { echo: String, msg_id: usize },
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("The Echo challenge does not expect to receive any response kind of message but received: {0}")]
+    ReceivedUnexpectedResponseMessage(String)
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum Response {
+pub enum Message {
+    #[serde(rename = "init")]
+    Init { 
+        #[serde(skip_serializing_if = "Option::is_none")]
+        msg_id: Option<usize>,
+        node_id: String
+    },
+    #[serde(rename = "echo")]
+    Echo { 
+        echo: String, 
+        #[serde(skip_serializing_if = "Option::is_none")]
+        msg_id: Option<usize> 
+    },
     #[serde(rename = "init_ok")]
-    InitOk { in_reply_to: usize },
+    InitOk { 
+        #[serde(skip_serializing_if = "Option::is_none")]
+        in_reply_to: Option<usize>
+    },
     #[serde(rename = "echo_ok")]
-    EchoOk { echo: String, in_reply_to: usize },
+    EchoOk { 
+        echo: String, 
+        #[serde(skip_serializing_if = "Option::is_none")]
+        in_reply_to: Option<usize>
+    },
 }
 
 #[derive(Debug, Default)]
@@ -28,29 +44,32 @@ pub struct Echo {
 }
 
 impl Actor for Echo {
-    type InboundMessage = Request;
-    type OutboundMessage = Response;
+    type Message = Message;
+    type Error = Error;
 
     fn handle_message(
         &mut self,
-        msg: Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>,
-    ) -> Option<Envelope<Message<Self::InboundMessage, Self::OutboundMessage>>> {
-        Some(match msg.body {
-            Message::Inbound(Request::Init { msg_id, ref node_id }) => {
+        msg: Envelope<Self::Message>,
+        outbound_msg_tx: std::sync::mpsc::Sender<Envelope<Self::Message>>,
+    ) -> Result<(), Self::Error> {
+        match msg.body {
+            Message::Init { msg_id, ref node_id } => {
                 self.node_id = Some(node_id.clone());
-                eprintln!("[INIT] Initialized node: {node_id}");
-                
-                msg.reply(Message::Outbound(Response::InitOk { in_reply_to: msg_id }))
-            }
-            Message::Inbound(Request::Echo { ref echo, msg_id }) => {
-                eprintln!("[ECHO] Echoing back: {echo}, in reply to: {msg_id}");
-
-                msg.reply(Message::Outbound(Response::EchoOk { echo: echo.to_string(), in_reply_to: msg_id }))
+                outbound_msg_tx.send(
+                    msg.reply(Message::InitOk { in_reply_to: msg_id })
+                ).unwrap();
+                Ok(())
             },
-            _ => {
-                panic!("Unexpected message: {msg:#?}");
-            }
-        })
+            Message::Echo { ref echo, msg_id } => {
+                outbound_msg_tx.send(
+                    msg.reply(
+                    Message::EchoOk { echo: echo.to_owned(), in_reply_to: msg_id }
+                    )
+                ).unwrap();
+                Ok(())
+            },
+            _ => Err(Error::ReceivedUnexpectedResponseMessage(format!("{:#?}", serde_json::to_string_pretty(&msg))))
+        }
     }
 }
 

@@ -2,8 +2,8 @@
 members = [
     "maelstrom-common",
     "echo",
-    "broadcast",
-    "unique-id-generation"
+    # "broadcast",
+    # "unique-id-generation"
 ]
 
 [profile.release]
