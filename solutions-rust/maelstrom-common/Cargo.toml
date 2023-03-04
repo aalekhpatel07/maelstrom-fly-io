@@ -2,6 +2,15 @@
 name = "maelstrom-common"
 version = "0.1.0"
 edition = "2021"
+authors = ["Aalekh Patel <aalekh.gwpeck.7998@icloud.com>"]
+description = "A simple boilerplate abstraction for running a Maelstrom node."
+license-file = "../../LICENSE.md"
+repository = "https://github.com/aalekhpatel07/maelstrom-fly-io"
+readme = "README.md"
+keywords = ["maelstrom", "fly.io", "boilerplate"]
+categories = ["development-tools::testing", "development-tools::profiling", "simulation"]
+documentation = "https://docs.rs/maelstrom-common"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
