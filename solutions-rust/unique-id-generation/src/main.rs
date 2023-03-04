@@ -9,7 +9,6 @@ pub enum Error {
     ReceivedUnexpectedResponseMessage(String),
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Message {
@@ -22,10 +21,10 @@ pub enum Message {
         node_id: String,
     },
     #[serde(rename = "generate_ok")]
-    GenerateOk { 
-        id: String, 
+    GenerateOk {
+        id: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        in_reply_to: Option<usize>
+        in_reply_to: Option<usize>,
     },
     #[serde(rename = "init_ok")]
     InitOk {
@@ -51,10 +50,14 @@ impl Actor for UniqueUuid {
     ) -> Result<(), Self::Error> {
         match msg.body {
             Message::Init {
-                msg_id, ref node_id, ..
+                msg_id,
+                ref node_id,
+                ..
             } => {
                 self.node_id = Some(node_id.clone());
-                let reply = msg.reply(Message::InitOk { in_reply_to: msg_id });
+                let reply = msg.reply(Message::InitOk {
+                    in_reply_to: msg_id,
+                });
                 outbound_msg_tx.send(reply).unwrap();
                 Ok(())
             }
@@ -72,8 +75,10 @@ impl Actor for UniqueUuid {
                 outbound_msg_tx.send(reply).unwrap();
 
                 Ok(())
-            },
-            _ => Err(Error::ReceivedUnexpectedResponseMessage(serde_json::to_string_pretty(&msg).unwrap()))
+            }
+            _ => Err(Error::ReceivedUnexpectedResponseMessage(
+                serde_json::to_string_pretty(&msg).unwrap(),
+            )),
         }
     }
 }
