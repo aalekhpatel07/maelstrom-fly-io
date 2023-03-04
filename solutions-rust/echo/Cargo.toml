@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
-name = "01-echo"
+name = "echo"
 path = "src/main.rs"
 
 [dependencies]
