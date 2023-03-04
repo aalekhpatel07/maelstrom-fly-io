@@ -7,7 +7,7 @@ description = "A simple boilerplate abstraction for running a Maelstrom node."
 license-file = "../../LICENSE.md"
 repository = "https://github.com/aalekhpatel07/maelstrom-fly-io"
 readme = "README.md"
-keywords = ["maelstrom", "fly.io", "boilerplate"]
+keywords = ["maelstrom", "fly-io", "distributed-systems", "testing"]
 categories = ["development-tools::testing", "development-tools::profiling", "simulation"]
 documentation = "https://docs.rs/maelstrom-common"
 
