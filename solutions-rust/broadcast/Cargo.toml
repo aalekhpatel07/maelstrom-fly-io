@@ -19,5 +19,5 @@ path = "src/main.rs"
 
 [dependencies]
 serde = { version = "1.0.152", features = ["derive"] }
-maelstrom-common = { version = "0.1.0", path = "../maelstrom-common" }
+maelstrom-common = { version = "0.1.1", path = "../maelstrom-common" }
 thiserror = "1.0.38"
