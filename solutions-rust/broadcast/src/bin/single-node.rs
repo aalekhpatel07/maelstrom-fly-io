@@ -1,63 +1,81 @@
-use broadcast::{Request, Response};
-use maelstrom_common::{run, Actor};
-use std::collections::HashSet;
+use broadcast::Message;
+use maelstrom_common::{run, HandleMessage, Envelope};
+use std::{collections::HashSet, sync::mpsc::Sender};
+
 
 #[derive(Debug, Default)]
 pub struct Broadcast {
     pub node_id: Option<String>,
-    pub neighbors: Vec<String>,
+    pub neighbors: HashSet<String>,
 
     // The order is not important.
     pub messages: HashSet<usize>,
 }
 
-impl Actor for Broadcast {
-    type InboundMessage = Request;
-    type OutboundMessage = Response;
+impl HandleMessage for Broadcast {
+    type Message = Message;
+    type Error = broadcast::Error;
 
     fn handle_message(
         &mut self,
-        msg: maelstrom_common::Envelope<maelstrom_common::Message<Self::InboundMessage, Self::OutboundMessage>>,
-    ) -> Option<maelstrom_common::Envelope<maelstrom_common::Message<Self::InboundMessage, Self::OutboundMessage>>> {
-        Some(match msg.body {
-            maelstrom_common::Message::Inbound(Request::Init {
+        msg: Envelope<Self::Message>,
+        outbound_msg_tx: Sender<Envelope<Self::Message>>
+    ) -> Result<(), Self::Error> {
+        match msg.body {
+            Message::Init {
                 msg_id,
                 ref node_id,
-                ref node_ids,
-            }) => {
+                node_ids,
+            } => {
                 self.node_id = Some(node_id.clone());
-                self.neighbors = node_ids.clone();
-                msg.reply(maelstrom_common::Message::Outbound(Response::InitOk {
-                    in_reply_to: msg_id,
-                }))
+                self.neighbors = node_ids;
+
+                let payload = Message::InitOk { in_reply_to: msg_id };
+                let reply = Envelope {
+                    src: msg.dest,
+                    dest: msg.src,
+                    body: payload,
+                };
+                outbound_msg_tx.send(reply).unwrap();
+                Ok(())
             }
-            maelstrom_common::Message::Inbound(Request::Topology {
+            Message::Topology {
                 msg_id,
-                ref topology,
-            }) => {
+                topology,
+            } => {
                 let node_id = self.node_id.clone().unwrap();
                 self.neighbors = topology
                     .get(&node_id)
                     .expect("to find a set of neighbors for us.")
                     .clone();
-                msg.reply(maelstrom_common::Message::Outbound(Response::Topology {
-                    in_reply_to: msg_id,
-                }))
+
+                let payload = Message::TopologyOk { in_reply_to: msg_id };
+                let reply = Envelope {
+                    src: msg.dest,
+                    dest: msg.src,
+                    body: payload,
+                };
+                outbound_msg_tx.send(reply).unwrap();
+                Ok(())
             }
-            maelstrom_common::Message::Inbound(Request::Broadcast { msg_id, message }) => {
+            Message::Broadcast { msg_id, message } => {
                 self.messages.insert(message);
-                msg.reply(maelstrom_common::Message::Outbound(Response::BroadcastOk {
-                    in_reply_to: msg_id,
-                }))
+                let reply = msg.reply(Message::BroadcastOk { in_reply_to: msg_id });
+                outbound_msg_tx.send(reply).unwrap();
+                Ok(())
             },
-            maelstrom_common::Message::Inbound(Request::Read { msg_id }) => msg.reply(maelstrom_common::Message::Outbound(Response::Read {
-                in_reply_to: msg_id,
-                messages: self.messages.clone().into_iter().collect::<Vec<_>>(),
-            })),
+            Message::Read { msg_id } => {
+                let reply = msg.reply(Message::ReadOk {
+                    in_reply_to: msg_id,
+                    messages: self.messages.clone(),
+                });
+                outbound_msg_tx.send(reply).unwrap();
+                Ok(())
+            },
             _ => {
-                panic!("Unexpected message: {:?}", msg);
+                Err(broadcast::Error::UnexpectedMessageType(format!("{:#?}", msg.body)))
             }
-        })
+        }
     }
 }
 

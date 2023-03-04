@@ -2,7 +2,7 @@
 members = [
     "maelstrom-common",
     "echo",
-    # "broadcast",
+    "broadcast",
     "unique-id-generation"
 ]
 
