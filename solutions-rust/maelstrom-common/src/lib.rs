@@ -18,52 +18,52 @@
 //! use maelstrom_common::{run, Actor, Envelope};
 //! use serde::{Deserialize, Serialize};
 //! use thiserror::Error;
-//! 
+//!
 //! #[derive(Error, Debug)]
 //! pub enum Error {
 //!     #[error("The Echo challenge does not expect to receive any response kind of message but received: {0}")]
 //!     ReceivedUnexpectedResponseMessage(String)
 //! }
-//! 
-//! 
+//!
+//!
 //! #[derive(Debug, Serialize, Deserialize)]
 //! #[serde(tag = "type")]
 //! pub enum Message {
 //!     #[serde(rename = "init")]
-//!     Init { 
+//!     Init {
 //!         #[serde(skip_serializing_if = "Option::is_none")]
 //!         msg_id: Option<usize>,
 //!         node_id: String
 //!     },
 //!     #[serde(rename = "echo")]
-//!     Echo { 
-//!         echo: String, 
+//!     Echo {
+//!         echo: String,
 //!         #[serde(skip_serializing_if = "Option::is_none")]
-//!         msg_id: Option<usize> 
+//!         msg_id: Option<usize>
 //!     },
 //!     #[serde(rename = "init_ok")]
-//!     InitOk { 
+//!     InitOk {
 //!         #[serde(skip_serializing_if = "Option::is_none")]
 //!         in_reply_to: Option<usize>
 //!     },
 //!     #[serde(rename = "echo_ok")]
-//!     EchoOk { 
-//!         echo: String, 
+//!     EchoOk {
+//!         echo: String,
 //!         #[serde(skip_serializing_if = "Option::is_none")]
 //!         in_reply_to: Option<usize>
 //!     },
 //! }
-//! 
+//!
 //! #[derive(Debug, Default)]
 //! pub struct Echo {
 //!     // Store our ID when a client initializes us.
 //!     node_id: Option<String>,
 //! }
-//! 
+//!
 //! impl Actor for Echo {
 //!     type Message = Message;
 //!     type Error = Error;
-//! 
+//!
 //!     fn handle_message(
 //!         &mut self,
 //!         msg: Envelope<Self::Message>,
@@ -89,7 +89,7 @@
 //!         }
 //!     }
 //! }
-//! 
+//!
 //! pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     run(Echo::default())?;
 //!     Ok(())
@@ -103,10 +103,10 @@
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::io;
-use std::sync::mpsc::channel;
-use std::thread::spawn;
-use std::sync::mpsc::Sender;
 use std::io::Write;
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Sender;
+use std::thread::spawn;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Envelope<B> {
@@ -120,7 +120,11 @@ where
     B: Serialize + DeserializeOwned,
 {
     pub fn new(src: &str, dest: &str, body: B) -> Self {
-        Envelope { src: src.to_owned(), dest: dest.to_owned(), body }
+        Envelope {
+            src: src.to_owned(),
+            dest: dest.to_owned(),
+            body,
+        }
     }
     pub fn reply<T>(&self, body: T) -> Envelope<T> {
         Envelope {
@@ -138,7 +142,7 @@ pub trait Actor {
     fn handle_message(
         &mut self,
         msg: Envelope<Self::Message>,
-        outbound_msg_tx: Sender<Envelope<Self::Message>>
+        outbound_msg_tx: Sender<Envelope<Self::Message>>,
     ) -> Result<(), Self::Error>;
 }
 
