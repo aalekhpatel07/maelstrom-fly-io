@@ -8,7 +8,7 @@ import shutil
 import shlex
 import os
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MaelstromInvoker")
 
 
@@ -122,7 +122,7 @@ def try_setup_maelstrom():
 
 def main():
     args = parse_args()
-    logger.info("Arguments: %s", args)
+    logger.debug("Arguments: %s", args)
     try_setup_maelstrom()
     build_binaries()
     copy_binaries_to_maelstrom_solutions()
