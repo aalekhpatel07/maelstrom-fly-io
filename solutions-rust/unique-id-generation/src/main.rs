@@ -1,4 +1,4 @@
-use maelstrom_common::{run, Actor, Envelope};
+use maelstrom_common::{run, HandleMessage, Envelope};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicUsize;
 use thiserror::Error;
@@ -39,7 +39,7 @@ pub struct UniqueUuid {
     pub node_id: Option<String>,
 }
 
-impl Actor for UniqueUuid {
+impl HandleMessage for UniqueUuid {
     type Message = Message;
     type Error = Error;
 

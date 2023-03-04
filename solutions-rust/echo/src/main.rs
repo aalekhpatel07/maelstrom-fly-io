@@ -1,4 +1,4 @@
-use maelstrom_common::{run, Actor, Envelope};
+use maelstrom_common::{run, HandleMessage, Envelope};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -42,7 +42,7 @@ pub struct Echo {
     node_id: Option<String>,
 }
 
-impl Actor for Echo {
+impl HandleMessage for Echo {
     type Message = Message;
     type Error = Error;
 
