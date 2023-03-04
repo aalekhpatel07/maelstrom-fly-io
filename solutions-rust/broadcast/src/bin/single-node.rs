@@ -1,7 +1,6 @@
 use broadcast::Message;
-use maelstrom_common::{run, HandleMessage, Envelope};
+use maelstrom_common::{run, Envelope, HandleMessage};
 use std::{collections::HashSet, sync::mpsc::Sender};
-
 
 #[derive(Debug, Default)]
 pub struct Broadcast {
@@ -19,7 +18,7 @@ impl HandleMessage for Broadcast {
     fn handle_message(
         &mut self,
         msg: Envelope<Self::Message>,
-        outbound_msg_tx: Sender<Envelope<Self::Message>>
+        outbound_msg_tx: Sender<Envelope<Self::Message>>,
     ) -> Result<(), Self::Error> {
         match msg.body {
             Message::Init {
@@ -30,7 +29,9 @@ impl HandleMessage for Broadcast {
                 self.node_id = Some(node_id.clone());
                 self.neighbors = node_ids;
 
-                let payload = Message::InitOk { in_reply_to: msg_id };
+                let payload = Message::InitOk {
+                    in_reply_to: msg_id,
+                };
                 let reply = Envelope {
                     src: msg.dest,
                     dest: msg.src,
@@ -39,17 +40,16 @@ impl HandleMessage for Broadcast {
                 outbound_msg_tx.send(reply).unwrap();
                 Ok(())
             }
-            Message::Topology {
-                msg_id,
-                topology,
-            } => {
+            Message::Topology { msg_id, topology } => {
                 let node_id = self.node_id.clone().unwrap();
                 self.neighbors = topology
                     .get(&node_id)
                     .expect("to find a set of neighbors for us.")
                     .clone();
 
-                let payload = Message::TopologyOk { in_reply_to: msg_id };
+                let payload = Message::TopologyOk {
+                    in_reply_to: msg_id,
+                };
                 let reply = Envelope {
                     src: msg.dest,
                     dest: msg.src,
@@ -60,10 +60,12 @@ impl HandleMessage for Broadcast {
             }
             Message::Broadcast { msg_id, message } => {
                 self.messages.insert(message);
-                let reply = msg.reply(Message::BroadcastOk { in_reply_to: msg_id });
+                let reply = msg.reply(Message::BroadcastOk {
+                    in_reply_to: msg_id,
+                });
                 outbound_msg_tx.send(reply).unwrap();
                 Ok(())
-            },
+            }
             Message::Read { msg_id } => {
                 let reply = msg.reply(Message::ReadOk {
                     in_reply_to: msg_id,
@@ -71,10 +73,11 @@ impl HandleMessage for Broadcast {
                 });
                 outbound_msg_tx.send(reply).unwrap();
                 Ok(())
-            },
-            _ => {
-                Err(broadcast::Error::UnexpectedMessageType(format!("{:#?}", msg.body)))
             }
+            _ => Err(broadcast::Error::UnexpectedMessageType(format!(
+                "{:#?}",
+                msg.body
+            ))),
         }
     }
 }

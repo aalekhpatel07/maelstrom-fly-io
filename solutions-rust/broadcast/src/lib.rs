@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use std::collections::{HashMap, HashSet};
+use thiserror::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -12,9 +12,7 @@ pub enum Message {
         node_ids: HashSet<String>,
     },
     #[serde(rename = "init_ok")]
-    InitOk {
-        in_reply_to: usize,
-    },
+    InitOk { in_reply_to: usize },
     #[serde(rename = "topology")]
     Topology {
         msg_id: usize,
@@ -22,9 +20,7 @@ pub enum Message {
     },
 
     #[serde(rename = "topology_ok")]
-    TopologyOk {
-        in_reply_to: usize,
-    },
+    TopologyOk { in_reply_to: usize },
 
     #[serde(rename = "broadcast")]
     Broadcast {
@@ -40,9 +36,7 @@ pub enum Message {
     },
 
     #[serde(rename = "read")]
-    Read { 
-        msg_id: usize
-    },
+    Read { msg_id: usize },
 
     #[serde(rename = "read_ok")]
     ReadOk {
@@ -51,10 +45,8 @@ pub enum Message {
     },
 }
 
-
 #[derive(Error, Debug)]
-pub enum Error
-{
+pub enum Error {
     #[error("Unexpected message type: {0:#?}")]
     UnexpectedMessageType(String),
 }
