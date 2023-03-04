@@ -2,102 +2,96 @@
 
 [jepsen-io/maelstrom](https://github.com/jepsen-io/maelstrom) is a workbench for testing toy implementations of distributed systems.
 
-This crate abstracts away the boilerplate of setting up the stdin/stdout for a node in a distributed system, and provides a few useful utilities for writing handlers.
+This crate abstracts away the boilerplate of setting up the stdin/stdout for a node
+in a distributed system, and provides a few useful utilities for writing handlers.
 
-*Note*: This crate is inspired from and primarily written for the [Fly.io Distributed Systems challenge](https://fly.io/dist-sys/).
+This crate is inspired from and primarily written for the [Fly.io Distributed Systems challenges](https://fly.io/dist-sys/).
 
+# Usage
 
+To use this crate, you'll create a node that is capable of handling
+some rpcs. Define the rpc messages with a serializable `Message` enum
+and define any meaningful error type that can stop the maelstrom test early
+in case of something going terribly wrong with the node.
 
-## Usage
-
-TLDR; Your node is an actor in the system that communicates with `Maelstrom` using enveloped messages.
-
-You'll need to implement the `Actor` trait. This trait has two associated types, `InboundMessage` and `OutboundMessage`. These types are used to define the types of messages that your actor can receive and send, respectively. 
-
-Write a `handle_message` that processes the requests coming in from clients and return the response appropriately.
-
-
+The node must implement the [HandleMessage] trait, which requires
+a `handle_message` function that takes an [Envelope] and a [Sender] for optionally
+sending any messages.
 ## Example
 
-A solution to the [first challenge](https://fly.io/dist-sys/1/).
+Let's create a simple echo node that responds to `init` and `echo` messages.
+This also corresponds to the [Echo challenge](https://fly.io/dist-sys/1/) in the [Fly.io Distributed Systems challenge set](https://fly.io/dist-sys/).
 
 ```rust
-use maelstrom_common::{
-    Actor, 
-    Envelope,
-    run
-};
-use serde::{Serialize, Deserialize};
-
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+use maelstrom_common::{run, HandleMessage, Envelope};
+use serde::{Deserialize, Serialize};
+use core::panic;
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum Request {
+pub enum Message {
     #[serde(rename = "init")]
     Init {
-        msg_id: usize,
-        node_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        msg_id: Option<usize>,
+        node_id: String
     },
     #[serde(rename = "echo")]
     Echo {
         echo: String,
-        msg_id: usize
-    }
-}
-
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "type")]
-pub enum Response {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        msg_id: Option<usize>
+    },
     #[serde(rename = "init_ok")]
     InitOk {
-        in_reply_to: usize,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        in_reply_to: Option<usize>
     },
     #[serde(rename = "echo_ok")]
     EchoOk {
         echo: String,
-        in_reply_to: usize
-    }
+        #[serde(skip_serializing_if = "Option::is_none")]
+        in_reply_to: Option<usize>
+    },
 }
-
-
 #[derive(Debug, Default)]
 pub struct Echo {
     // Store our ID when a client initializes us.
-    node_id: Option<String>
+    node_id: Option<String>,
 }
-
-
-impl Actor for Echo {
-    type InboundMessage = Request;
-    type OutboundMessage = Response;
-    
-    fn handle_message(&mut self, msg: Envelope<Self::InboundMessage>) -> Option<Envelope<Self::OutboundMessage>> {
-
-        Some(match msg.body {
-            Request::Init { msg_id, node_id } => {
+impl HandleMessage for Echo {
+    type Message = Message;
+    type Error = std::io::Error;
+    fn handle_message(
+        &mut self,
+        msg: Envelope<Self::Message>,
+        outbound_msg_tx: std::sync::mpsc::Sender<Envelope<Self::Message>>,
+    ) -> Result<(), Self::Error> {
+        match msg.body {
+            Message::Init { msg_id, ref node_id } => {
                 self.node_id = Some(node_id.clone());
-                eprintln!("[INIT] Initialized node: {}", node_id);
-                Envelope {
-                    body: Response::InitOk { in_reply_to: msg_id },
-                    src: msg.dest,
-                    dest: msg.src
-                }
+                outbound_msg_tx.send(
+                    msg.reply(Message::InitOk { in_reply_to: msg_id })
+                ).unwrap();
+                Ok(())
             },
-            Request::Echo { echo, msg_id } => {
-                eprintln!("[ECHO] Echoing back: {}, in reply to: {}", echo, msg_id);
-                Envelope {
-                    src: msg.dest,
-                    dest: msg.src,
-                    body: Response::EchoOk { echo, in_reply_to: msg_id }
-                }
+            Message::Echo { ref echo, msg_id } => {
+                outbound_msg_tx.send(
+                    msg.reply(
+                    Message::EchoOk { echo: echo.to_owned(), in_reply_to: msg_id }
+                    )
+                ).unwrap();
+                Ok(())
             },
-        })
+            _ => panic!("{}", format!("Unexpected message: {:#?}", serde_json::to_string_pretty(&msg)))
+        }
     }
 }
-
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     run(Echo::default())?;
-    Ok(())
+   Ok(())
 }
 ```
+
+## Contributing
+
+[Issues](https://github.com/aalekhpatel07/maelstrom-fly-io/issues/new), [Pull Requests](https://github.com/aalekhpatel07/maelstrom-fly-io/pulls), and [Github stars](https://github.com/aalekhpatel07/maelstrom-fly-io) are always appreciated.
