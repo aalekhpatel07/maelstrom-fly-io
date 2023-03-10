@@ -3,21 +3,17 @@ name = "broadcast"
 version = "0.1.0"
 edition = "2021"
 
-
 [[bin]]
 name = "broadcast-single-node"
-path = "src/bin/single-node.rs"
+path = "src/bin/single_node.rs"
 
 [[bin]]
-name = "broadcast-multi-node"
-path = "src/bin/multi-node.rs"
-
-[[bin]]
-name = "broadcast-fault-tolerant"
+name = "broadcast"
 path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 serde = { version = "1.0.152", features = ["derive"] }
-maelstrom-common = { version = "0.1.1", path = "../maelstrom-common" }
+serde_json = "1.0.94"
+maelstrom-common = { version = "0.1.2", path = "../maelstrom-common" }
 thiserror = "1.0.38"

@@ -97,15 +97,19 @@
 //! ```
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::from_str;
 use std::io;
 use std::io::Write;
+use std::io::stdin;
+use std::sync::mpsc::Receiver;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Sender;
+use std::thread::JoinHandle;
 use std::thread::spawn;
 
 /// A formal structure for any message sent between nodes
 /// or clients in a maelstrom orchestrated distributed system.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Envelope<B> {
     /// An identifier for the sender of the message.
     pub src: String,
@@ -142,6 +146,13 @@ where
             dest: self.src.clone(),
             body,
         }
+    }
+
+    pub fn send(&self) {
+        let data = serde_json::to_string(self).unwrap();
+        let data_pretty = serde_json::to_string_pretty(self).unwrap();
+        println!("{}", data);
+        eprintln!("Sent (pretty): {}", data_pretty);
     }
 }
 
@@ -225,5 +236,64 @@ where
             let msg: _ = inbound_msg_rx.recv().unwrap();
             self.node.handle_message(msg, outbound_msg_tx.clone())?;
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct PostOffice<E> {
+    rx: Receiver<String>,
+    subscribers: Vec<Sender<E>>
+}
+
+impl<E> PostOffice<E> 
+where
+    E: DeserializeOwned + Serialize + Clone + Send + Sync + 'static
+{
+
+    pub fn new(rx: Receiver<String>) -> Self {
+        Self {
+            rx,
+            subscribers: vec![]
+        }
+    }
+
+    pub fn subscribe(&mut self) -> Receiver<E> {
+        let (tx, rx) = channel();
+        self.subscribers.push(tx);
+        rx
+    }
+
+    pub fn start(self) -> JoinHandle<()> {
+        let (tx, rx) = channel::<String>();
+
+        let handle1 = spawn(move || {
+            for line in rx {
+                let serialized: E = from_str(&line).unwrap();
+                for subscriber in &self.subscribers {
+                    subscriber.send(serialized.clone()).unwrap();
+                }
+            }
+        });
+
+        let handle2 = spawn(move || {
+            while let Ok(line) = self.rx.recv() {
+                tx.send(line).unwrap();
+            }
+        });
+
+        let all_joined = spawn(move || {
+            _ = handle1.join();
+            _ = handle2.join();
+        });
+
+        all_joined
+    }
+
+}
+
+
+pub fn listen(tx: Sender<String>) {
+    for line in stdin().lines() {
+        tx.send(line.unwrap()).unwrap();
     }
 }
