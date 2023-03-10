@@ -37,7 +37,7 @@ CHALLENGE_COMMANDS = {
     "1": "./maelstrom test -w echo --bin solutions/echo --time-limit 5",
     "2": "./maelstrom test -w unique-ids --bin solutions/unique-id-generation --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition",
     "3a": "./maelstrom test -w broadcast --bin solutions/broadcast-single-node --node-count 1 --time-limit 20 --rate 10",
-    "3b": "./maelstrom test -w broadcast --bin solutions/broadcast-multi-node --node-count 5 --time-limit 20 --rate 10",
+    "3b": "./maelstrom test -w broadcast --bin solutions/broadcast-multi-node --node-count 5 --time-limit 100 --rate 10",
     # "3c": "./maelstrom test -w broadcast --bin solutions/03c-broadcast-fault-tolerant --node-count 5 --time-limit 20 --rate 10 --nemesis partition",
 }
 
