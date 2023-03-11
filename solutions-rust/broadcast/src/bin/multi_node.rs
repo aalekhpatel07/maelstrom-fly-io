@@ -62,6 +62,8 @@ impl MessageBroadcaster {
                     // We're guaranteed that a single client doesn't receive any duplicated
                     // messages but a server node could still send us a broadcast, so we'll have
                     // to ignore it.
+                    let our_id = guard.metadata.id.clone().unwrap();
+                    
                     if !guard.messages.contains(message) {
                         guard.messages.insert(*message);
 
@@ -69,7 +71,9 @@ impl MessageBroadcaster {
                         .metadata
                         .topology
                         .keys()
-                        .filter(|&neighbor| neighbor != &envelope.src )
+                        .filter(
+                            |&neighbor| neighbor != &envelope.src && neighbor != &our_id
+                        )
                         .for_each(|neighbor| {
                             Envelope::new(
                                 &guard.metadata.id.as_ref().unwrap(), 
