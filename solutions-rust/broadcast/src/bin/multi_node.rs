@@ -1,5 +1,4 @@
-use std::{collections::{HashSet, HashMap}, sync::{mpsc::{Receiver, channel}, Arc, Mutex, RwLock}, fs::Metadata, thread::{spawn, JoinHandle}};
-
+use std::{collections::{HashSet, HashMap}, sync::{mpsc::{Receiver, channel}, Arc, Mutex}, thread::{spawn, JoinHandle}, io::stdin};
 use maelstrom_common::*;
 use broadcast::*;
 
@@ -39,13 +38,15 @@ impl MessageBroadcaster {
 
     pub fn run(self) {
         while let Ok(envelope) = self.rx.recv() {
-            let mut guard = self.state.lock().unwrap();
+            let guard = self.state.lock().unwrap();
             if guard.metadata.id.is_some() && Some(&envelope.dest) != guard.metadata.id.as_ref() {
                 panic!("Received an envelope meant for someone else. wtf...");
             }
+            drop(guard);
 
             match &envelope.body {
                 Message::Init { msg_id, node_id, node_ids } => {                    
+                    let mut guard = self.state.lock().unwrap();
                     guard.metadata.id = Some(node_id.clone());
                     guard.metadata.node_ids = node_ids.clone();
                     envelope.reply(
@@ -53,12 +54,14 @@ impl MessageBroadcaster {
                     ).send();
                 },
                 Message::Topology { msg_id, topology } => {
+                    let mut guard = self.state.lock().unwrap();
                     guard.metadata.topology = topology.clone();
                     envelope.reply(
                         Message::TopologyOk { in_reply_to: *msg_id }
                     ).send();
                 },
                 Message::Broadcast { msg_id, message } => {
+                    let mut guard = self.state.lock().unwrap();
                     // We're guaranteed that a single client doesn't receive any duplicated
                     // messages but a server node could still send us a broadcast, so we'll have
                     // to ignore it.
@@ -66,6 +69,13 @@ impl MessageBroadcaster {
 
                     if !guard.messages.contains(message) {
                         guard.messages.insert(*message);
+
+                        // Only reply the clients.
+                        if !guard.metadata.node_ids.contains(&envelope.src) {
+                            envelope.reply(
+                                Message::BroadcastOk { in_reply_to: *msg_id }
+                            ).send();
+                        }
 
                         guard
                         .metadata
@@ -84,19 +94,16 @@ impl MessageBroadcaster {
                             )
                             .send();
                         });
-
-                        // Only reply the clients.
-                        if !guard.metadata.node_ids.contains(&envelope.src) {
-                            envelope.reply(
-                                Message::BroadcastOk { in_reply_to: *msg_id }
-                            ).send();
-                        }
                     }
                 },
-                Message::Read { msg_id } => {                    
-                    let messages = guard.messages.clone();
+
+                Message::Read { msg_id } => {
+                    let guard = self.state.lock().unwrap();
                     envelope.reply(
-                        Message::ReadOk { in_reply_to: *msg_id, messages }
+                        Message::ReadOk { 
+                            in_reply_to: *msg_id, 
+                            messages: guard.messages.clone().into_iter().collect()
+                        }
                     ).send();
                 },
                 Message::BroadcastOk { .. } => {
@@ -116,11 +123,14 @@ pub fn main() {
     let state = Arc::new(Mutex::new(Default::default()));
 
     let (tx, rx) = channel();
-    let mut post_office = PostOffice::new(rx);
+    // let mut post_office = PostOffice::new(rx);
 
-    let acknowledger = MessageBroadcaster::new(post_office.subscribe(), state);
-    post_office.start();
+    let acknowledger = MessageBroadcaster::new(rx, state);
+    // post_office.start();
     acknowledger.start();
 
-    listen(tx);
+    for line in stdin().lines() {
+        tx.send(serde_json::from_str(&line.unwrap()).unwrap()).unwrap();
+    }
+    // listen(tx);
 }
