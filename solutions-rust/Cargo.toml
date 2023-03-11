@@ -1,10 +1,49 @@
-[workspace]
-members = [
-    "maelstrom-common",
-    "echo",
-    "broadcast",
-    "unique-id-generation"
-]
+[package]
+name = "maelstrom"
+version = "0.1.0"
+edition = "2021"
+authors = ["Aalekh Patel <aalekh.gwpeck.7998@icloud.com>"]
+description = "A simple boilerplate abstraction for running a Maelstrom node."
+license-file = "../../LICENSE.md"
+repository = "https://github.com/aalekhpatel07/maelstrom-fly-io"
+readme = "README.md"
+keywords = ["maelstrom", "fly-io", "distributed-systems", "testing"]
+categories = ["development-tools::testing", "development-tools::profiling", "simulation"]
+documentation = "https://docs.rs/maelstrom-common"
+
+[[bin]]
+name = "maelstrom-echo"
+path = "src/bin/echo.rs"
+
+[[bin]]
+name = "maelstrom-unique-id-generation"
+path = "src/bin/unique-id-generation.rs"
+
+[[bin]]
+name = "maelstrom-broadcast-single-node"
+path = "src/bin/broadcast-single.rs"
+
+[[bin]]
+name = "maelstrom-broadcast-multi-node"
+path = "src/bin/broadcast-multi-node.rs"
+
+[[bin]]
+name = "maelstrom-broadcast-fault-tolerant"
+path = "src/bin/broadcast-fault-tolerant.rs"
+
+[[bin]]
+name = "maelstrom-broadcast-efficient-part-1"
+path = "src/bin/broadcast-efficient-part-1.rs"
+
+[[bin]]
+name = "maelstrom-broadcast-efficient-part-2"
+path = "src/bin/broadcast-efficient-part-2.rs"
 
 [profile.release]
 lto = "fat"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.93"
