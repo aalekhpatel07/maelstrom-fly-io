@@ -80,7 +80,7 @@ where
     pub fn send(&self) {
         let mut stdout = std::io::stdout().lock();
         serde_json::to_writer(&mut stdout, self).unwrap();
-        stdout.write(b"\n").unwrap();
+        stdout.write_all(b"\n").unwrap();
         stdout.flush().unwrap();
     }
 }
