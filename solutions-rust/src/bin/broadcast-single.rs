@@ -50,7 +50,7 @@ pub fn main() {
                 envelope.reply(Message::BroadcastOk).send();
             },
             Message::Read => {
-                envelope.reply(Message::ReadOk { messages: messages.iter().copied().collect() }).send();
+                envelope.reply(Message::ReadOk { messages: messages.to_vec() }).send();
             },
             _ => {}
         }

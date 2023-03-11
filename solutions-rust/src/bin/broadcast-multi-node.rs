@@ -1,5 +1,5 @@
 
-use std::{sync::mpsc::{channel, RecvTimeoutError}, thread::spawn, collections::{HashMap, HashSet}, ops::Rem, time::{Instant, Duration}};
+use std::{sync::mpsc::{channel}, thread::spawn, collections::{HashMap, HashSet}, time::{Instant, Duration}};
 
 use maelstrom::*;
 use serde::{Serialize, Deserialize};
@@ -120,7 +120,7 @@ pub fn main() {
                                 }
                             }
                         }
-                        envelope.reply(Message::SyncOk { messages: inbound.iter().copied().collect() }).send();
+                        envelope.reply(Message::SyncOk { messages: inbound.to_vec() }).send();
                     }
                     // SyncOk's are internal messages from other servers
                     // that we can use to mark some messages as acknowledged, in bulk,
@@ -143,10 +143,10 @@ pub fn main() {
                 if !remote_node_handler.unacknowledged_messages.is_empty() {
                     Envelope::new(
                         &our_id, 
-                        &remote_node_id, 
+                        remote_node_id, 
                         None, 
                         Message::Sync { 
-                            messages: remote_node_handler.unacknowledged_messages.iter().copied().collect()
+                            messages: remote_node_handler.unacknowledged_messages.to_vec()
                         }
                     ).send();
                 }
