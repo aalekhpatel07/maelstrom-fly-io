@@ -1,27 +1,25 @@
-use std::sync::mpsc::{Sender, Receiver, channel};
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 use std::fmt::Debug;
 use std::thread::spawn;
 
 use crate::envelope::Envelope;
 
-
 #[derive(Debug)]
 pub struct PubSub<M> {
     rx: Receiver<Envelope<M>>,
-    subscribers: Vec<Sender<Envelope<M>>>
+    subscribers: Vec<Sender<Envelope<M>>>,
 }
 
-impl<M> PubSub<M> 
+impl<M> PubSub<M>
 where
-    M: DeserializeOwned + Serialize + Clone + Send + Sync + 'static + Debug
+    M: DeserializeOwned + Serialize + Clone + Send + Sync + 'static + Debug,
 {
-
     pub fn new(rx: Receiver<Envelope<M>>) -> Self {
         Self {
             rx,
-            subscribers: vec![]
+            subscribers: vec![],
         }
     }
 

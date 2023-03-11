@@ -1,7 +1,12 @@
-use std::{sync::mpsc::{channel, RecvTimeoutError}, thread::spawn, collections::{HashMap, HashSet}, time::{Instant, Duration}};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::mpsc::{channel, RecvTimeoutError},
+    thread::spawn,
+    time::{Duration, Instant},
+};
 
 use maelstrom::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 const SYNC_INTERVAL: Duration = Duration::from_millis(250);
 
@@ -10,33 +15,32 @@ const SYNC_INTERVAL: Duration = Duration::from_millis(250);
 pub enum Message {
     Init {
         node_id: String,
-        node_ids: Vec<String>
+        node_ids: Vec<String>,
     },
     InitOk,
     Topology {
-        topology: HashMap<String, Vec<String>>
+        topology: HashMap<String, Vec<String>>,
     },
     TopologyOk,
     Broadcast {
-        message: usize
+        message: usize,
     },
     BroadcastOk,
     Read,
     ReadOk {
-        messages: Vec<usize>
+        messages: Vec<usize>,
     },
     Sync {
-        messages: Vec<usize>
+        messages: Vec<usize>,
     },
     SyncOk {
-        messages: Vec<usize>
-    }
+        messages: Vec<usize>,
+    },
 }
-
 
 #[derive(Debug, Default)]
 pub struct RemoteNodeHandler {
-    unacknowledged_messages: Vec<usize>
+    unacknowledged_messages: Vec<usize>,
 }
 
 impl RemoteNodeHandler {
@@ -49,13 +53,12 @@ impl RemoteNodeHandler {
     }
 
     pub fn acknowledge_synced(&mut self, messages: &[usize]) {
-        self.unacknowledged_messages.retain(|message| !messages.contains(message));
+        self.unacknowledged_messages
+            .retain(|message| !messages.contains(message));
     }
 }
 
-
 pub fn main() {
-
     let (tx, rx) = channel::<Envelope<Message>>();
 
     spawn(move || {
@@ -71,81 +74,95 @@ pub fn main() {
     let mut deadline = Instant::now() + SYNC_INTERVAL;
 
     loop {
-
         let should_wait_for_at_most = deadline - Instant::now();
 
         match rx.recv_timeout(should_wait_for_at_most) {
-            Ok(envelope) => {
-                match envelope.message() {
-                    Message::Init { node_id, node_ids } => {
-                        our_id = node_id.to_owned();
-                        for (_, node_id) in node_ids.iter().enumerate() {
-                            remote_node_handlers.insert(node_id.clone(), RemoteNodeHandler::new());
-                        }
-                        envelope.reply(Message::InitOk).send();
-                    },
-
-                    Message::Topology { topology } => {
-                        our_neighbors = topology.get(&our_id).unwrap().clone();
-                        envelope.reply(Message::TopologyOk).send();
-                    },
-
-                    Message::Broadcast { message } => {
-                        if messages.insert(*message) {
-                            for neighbor in &our_neighbors {
-                                remote_node_handlers.get_mut(neighbor).unwrap().send_message(*message);
-                            }
-                        }
-                        envelope.reply(Message::BroadcastOk).send();
-                    },
-
-                    Message::BroadcastOk => {
-
-                    },
-
-                    Message::Read => {
-                        envelope.reply(Message::ReadOk { messages: messages.iter().copied().collect() }).send();
-                    },
-
-                    Message::Sync { messages: inbound } => {
-                        for &message in inbound {
-                            if messages.insert(message) {
-                                for neighbor in &our_neighbors {
-                                    remote_node_handlers.get_mut(neighbor).unwrap().send_message(message);
-                                }
-                            }
-                        }
-                        envelope.reply(Message::SyncOk { messages: inbound.to_vec() }).send();
+            Ok(envelope) => match envelope.message() {
+                Message::Init { node_id, node_ids } => {
+                    our_id = node_id.to_owned();
+                    for (_, node_id) in node_ids.iter().enumerate() {
+                        remote_node_handlers.insert(node_id.clone(), RemoteNodeHandler::new());
                     }
-
-                    Message::SyncOk { messages: acknowledged_messages } => {
-                        remote_node_handlers.get_mut(&envelope.src).unwrap().acknowledge_synced(acknowledged_messages);
-                    }
-
-                    _ => unimplemented!()
+                    envelope.reply(Message::InitOk).send();
                 }
+
+                Message::Topology { topology } => {
+                    our_neighbors = topology.get(&our_id).unwrap().clone();
+                    envelope.reply(Message::TopologyOk).send();
+                }
+
+                Message::Broadcast { message } => {
+                    if messages.insert(*message) {
+                        for neighbor in &our_neighbors {
+                            remote_node_handlers
+                                .get_mut(neighbor)
+                                .unwrap()
+                                .send_message(*message);
+                        }
+                    }
+                    envelope.reply(Message::BroadcastOk).send();
+                }
+
+                Message::BroadcastOk => {}
+
+                Message::Read => {
+                    envelope
+                        .reply(Message::ReadOk {
+                            messages: messages.iter().copied().collect(),
+                        })
+                        .send();
+                }
+
+                Message::Sync { messages: inbound } => {
+                    for &message in inbound {
+                        if messages.insert(message) {
+                            for neighbor in &our_neighbors {
+                                remote_node_handlers
+                                    .get_mut(neighbor)
+                                    .unwrap()
+                                    .send_message(message);
+                            }
+                        }
+                    }
+                    envelope
+                        .reply(Message::SyncOk {
+                            messages: inbound.to_vec(),
+                        })
+                        .send();
+                }
+
+                Message::SyncOk {
+                    messages: acknowledged_messages,
+                } => {
+                    remote_node_handlers
+                        .get_mut(&envelope.src)
+                        .unwrap()
+                        .acknowledge_synced(acknowledged_messages);
+                }
+
+                _ => unimplemented!(),
             },
-            Err(RecvTimeoutError::Disconnected) => {},
+            Err(RecvTimeoutError::Disconnected) => {}
             Err(RecvTimeoutError::Timeout) => {}
         }
 
         if Instant::now() >= deadline {
             remote_node_handlers
-            .iter()
-            .for_each(|(remote_node_id, remote_node_handler)| {
-                if !remote_node_handler.unacknowledged_messages.is_empty() {
-                    Envelope::new(
-                        &our_id, 
-                        remote_node_id, 
-                        None, 
-                        Message::Sync { 
-                            messages: remote_node_handler.unacknowledged_messages.to_vec()
-                        }
-                    ).send();
-                }
-            });
+                .iter()
+                .for_each(|(remote_node_id, remote_node_handler)| {
+                    if !remote_node_handler.unacknowledged_messages.is_empty() {
+                        Envelope::new(
+                            &our_id,
+                            remote_node_id,
+                            None,
+                            Message::Sync {
+                                messages: remote_node_handler.unacknowledged_messages.to_vec(),
+                            },
+                        )
+                        .send();
+                    }
+                });
             deadline += SYNC_INTERVAL;
         }
     }
-
 }

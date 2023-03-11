@@ -1,26 +1,29 @@
-
-use std::{sync::{mpsc::{channel, Receiver}, atomic::{AtomicUsize, Ordering}}, thread::spawn};
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        mpsc::{channel, Receiver},
+    },
+    thread::spawn,
+};
 
 use maelstrom::*;
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Message {
     Init {
         node_id: String,
-        node_ids: Vec<String>
+        node_ids: Vec<String>,
     },
     InitOk,
     Generate,
     GenerateOk {
-        id: String
-    }
+        id: String,
+    },
 }
 
 pub fn handle_message(rx: Receiver<Envelope<Message>>) {
-
     let mut our_id = None;
     let id = AtomicUsize::new(0);
 
@@ -29,24 +32,25 @@ pub fn handle_message(rx: Receiver<Envelope<Message>>) {
             Message::Init { node_id, .. } => {
                 our_id = Some(node_id.clone());
                 msg.reply(Message::InitOk).send();
-            },
+            }
 
             Message::Generate => {
-                let id = format!("{}-{}", our_id.as_ref().unwrap(), id.fetch_add(1, Ordering::SeqCst));
+                let id = format!(
+                    "{}-{}",
+                    our_id.as_ref().unwrap(),
+                    id.fetch_add(1, Ordering::SeqCst)
+                );
                 msg.reply(Message::GenerateOk { id }).send();
-            },
+            }
             _ => {}
         }
     }
 }
 
 pub fn main() {
-
     let (tx, rx) = channel::<Envelope<Message>>();
 
-    spawn(move || {
-        handle_message(rx)
-    });
+    spawn(move || handle_message(rx));
 
     read_stdin(tx);
 }

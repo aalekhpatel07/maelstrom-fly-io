@@ -1,7 +1,7 @@
-use std::sync::mpsc::Sender;
-use std::io;
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
+use std::io;
+use std::sync::mpsc::Sender;
 
 mod envelope;
 pub use envelope::*;

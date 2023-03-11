@@ -1,6 +1,9 @@
-use std::{sync::atomic::{AtomicUsize, Ordering}, ops::Deref, io::Write};
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
+use std::{
+    io::Write,
+    ops::Deref,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 /// A body contains identifiers for messages
 /// and replies if it is a communication between
@@ -11,16 +14,15 @@ pub struct Body<M> {
     /// The id that the client gives us for any rpc it makes.
     #[serde(skip_serializing_if = "Option::is_none")]
     msg_id: Option<usize>,
-    
+
     /// The message our rpc response corresponds to.
     #[serde(skip_serializing_if = "Option::is_none")]
     in_reply_to: Option<usize>,
 
     /// The actual payload.
     #[serde(flatten)]
-    message: M
+    message: M,
 }
-
 
 impl<M> Body<M> {
     pub fn msg_id(&self) -> Option<usize> {
@@ -34,21 +36,18 @@ impl<M> Body<M> {
     }
 }
 
-
 static MESSAGE_ID: AtomicUsize = AtomicUsize::new(0);
-
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Envelope<M> {
     pub src: String,
     pub dest: String,
-    body: Body<M>
+    body: Body<M>,
 }
 
-
-impl<M> Envelope<M> 
+impl<M> Envelope<M>
 where
-    M: Serialize
+    M: Serialize,
 {
     /// Create a new envelope from the source to the destination,
     /// (optionally) as a reply to another message, that contains a given body.
@@ -59,8 +58,8 @@ where
             body: Body {
                 msg_id: Some(MESSAGE_ID.fetch_add(1, Ordering::SeqCst)),
                 in_reply_to,
-                message
-            }
+                message,
+            },
         }
     }
 
@@ -73,7 +72,15 @@ where
     /// Generate a reply for us envelope that contains
     /// the specified body.
     pub fn reply(&self, message: M) -> Envelope<M> {
-        Envelope { src: self.dest.clone(), dest: self.src.clone(), body: Body { msg_id: Some(MESSAGE_ID.fetch_add(1, Ordering::SeqCst)), in_reply_to: self.msg_id(), message } }
+        Envelope {
+            src: self.dest.clone(),
+            dest: self.src.clone(),
+            body: Body {
+                msg_id: Some(MESSAGE_ID.fetch_add(1, Ordering::SeqCst)),
+                in_reply_to: self.msg_id(),
+                message,
+            },
+        }
     }
 
     /// Send messages out to stdout.
@@ -84,7 +91,6 @@ where
         stdout.flush().unwrap();
     }
 }
-
 
 /// So that whatever pub api Body offers,
 /// Envelope can too.
