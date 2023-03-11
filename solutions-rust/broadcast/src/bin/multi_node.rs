@@ -63,16 +63,18 @@ impl MessageBroadcaster {
                     // messages but a server node could still send us a broadcast, so we'll have
                     // to ignore it.
                     let our_id = guard.metadata.id.clone().unwrap();
-                    
+
                     if !guard.messages.contains(message) {
                         guard.messages.insert(*message);
 
                         guard
                         .metadata
                         .topology
-                        .keys()
+                        .get(&our_id)
+                        .unwrap()
+                        .iter()
                         .filter(
-                            |&neighbor| neighbor != &envelope.src && neighbor != &our_id
+                            |&neighbor| neighbor != &envelope.src
                         )
                         .for_each(|neighbor| {
                             Envelope::new(
@@ -84,7 +86,7 @@ impl MessageBroadcaster {
                         });
 
                         // Only reply the clients.
-                        if msg_id.is_some() {
+                        if !guard.metadata.node_ids.contains(&envelope.src) {
                             envelope.reply(
                                 Message::BroadcastOk { in_reply_to: *msg_id }
                             ).send();
