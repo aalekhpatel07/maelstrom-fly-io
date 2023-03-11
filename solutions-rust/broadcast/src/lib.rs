@@ -31,3 +31,13 @@ pub enum Message {
         messages: HashSet<usize>,
     },
 }
+
+impl Message {
+    pub fn is_from_server_node(&self) -> bool {
+        match self {
+            Message::Broadcast { msg_id, .. } => msg_id.is_none(),
+            Message::BroadcastOk { in_reply_to, .. } => in_reply_to.is_none(),
+            _ => false
+        }
+    }
+}

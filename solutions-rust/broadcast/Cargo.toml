@@ -8,6 +8,10 @@ name = "broadcast-single-node"
 path = "src/bin/single_node.rs"
 
 [[bin]]
+name = "broadcast-multi-node"
+path = "src/bin/multi_node.rs"
+
+[[bin]]
 name = "broadcast"
 path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
