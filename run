@@ -21,6 +21,9 @@ Currently, the following challenges are implemented:
 - 02: Unique ID Generation
 - 03a: Broadcast (Single Node)
 - 03b: Broadcast (Multi-Node)
+- 03c: Broadcast (Multi-Node Fault-tolerant)
+- 03d: Broadcast (Multi-Node Efficient 1)
+- 03e: Broadcast (Multi-Node Efficient 2)
 
 '''
 
@@ -33,7 +36,8 @@ IMPLEMENTED_CHALLENGES = {
     "3c": "Broadcast (Fault Tolerant)",
     "3d": "Broadcast (Efficient 1)",
     "3e": "Broadcast (Efficient 2)",
-    "4": "Grow only counter"
+    "4": "Grow only counter",
+    "5a": "Kafka style log (Single Node)"
 }
 
 CHALLENGE_COMMANDS = {
@@ -44,7 +48,8 @@ CHALLENGE_COMMANDS = {
     "3c": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-fault-tolerant --node-count 5 --time-limit 20 --rate 10 --nemesis partition",
     "3d": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-efficient-part-1 --node-count 25 --time-limit 20 --rate 100 --latency 100",
     "3e": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-efficient-part-2 --node-count 25 --time-limit 20 --rate 100 --latency 100",
-    "4": "./maelstrom test -w g-counter --bin solutions/maelstrom-grow-only-counter --node-count 3 --rate 100 --time-limit 20 --nemesis partition"
+    "4": "./maelstrom test -w g-counter --bin solutions/maelstrom-grow-only-counter --node-count 3 --rate 100 --time-limit 20 --nemesis partition",
+    "5a": "./maelstrom test -w kafka --bin solutions/maelstrom-kafka-part-1 --node-count 1 --concurrency 2n --time-limit 20 --rate 1000"
 }
 
 def parse_args():
