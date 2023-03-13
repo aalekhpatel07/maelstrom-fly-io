@@ -39,11 +39,16 @@ path = "src/bin/broadcast-efficient-part-1.rs"
 name = "maelstrom-broadcast-efficient-part-2"
 path = "src/bin/broadcast-efficient-part-2.rs"
 
+[[bin]]
+name = "maelstrom-grow-only-counter"
+path = "src/bin/grow-only-counter.rs"
+
 [profile.release]
 lto = "fat"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+oneshot = "0.1.5"
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = "1.0.93"

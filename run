@@ -30,15 +30,21 @@ IMPLEMENTED_CHALLENGES = {
     "2": "Unique ID Generation", 
     "3a": "Broadcast (Single Node)",
     "3b": "Broadcast (Multi-Node)",
-    # "3c": "Broadcast (Fault Tolerant)"
+    "3c": "Broadcast (Fault Tolerant)",
+    "3d": "Broadcast (Efficient 1)",
+    "3e": "Broadcast (Efficient 2)",
+    "4": "Grow only counter"
 }
 
 CHALLENGE_COMMANDS = {
-    "1": "./maelstrom test -w echo --bin solutions/echo --time-limit 5",
-    "2": "./maelstrom test -w unique-ids --bin solutions/unique-id-generation --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition",
-    "3a": "./maelstrom test -w broadcast --bin solutions/broadcast-single-node --node-count 1 --time-limit 20 --rate 10",
-    "3b": "./maelstrom test -w broadcast --bin solutions/broadcast-multi-node --node-count 5 --time-limit 100 --rate 10",
-    # "3c": "./maelstrom test -w broadcast --bin solutions/03c-broadcast-fault-tolerant --node-count 5 --time-limit 20 --rate 10 --nemesis partition",
+    "1": "./maelstrom test -w echo --bin solutions/maelstrom-echo --time-limit 5",
+    "2": "./maelstrom test -w unique-ids --bin solutions/maelstrom-unique-id-generation --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition",
+    "3a": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-single-node --node-count 1 --time-limit 20 --rate 10",
+    "3b": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-multi-node --node-count 5 --time-limit 100 --rate 10",
+    "3c": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-fault-tolerant --node-count 5 --time-limit 20 --rate 10 --nemesis partition",
+    "3d": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-efficient-part-1 --node-count 25 --time-limit 20 --rate 100 --latency 100",
+    "3e": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-efficient-part-2 --node-count 25 --time-limit 20 --rate 100 --latency 100",
+    "4": "./maelstrom test -w g-counter --bin solutions/maelstrom-grow-only-counter --node-count 3 --rate 100 --time-limit 20 --nemesis partition"
 }
 
 def parse_args():
