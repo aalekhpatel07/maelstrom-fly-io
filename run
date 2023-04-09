@@ -8,7 +8,7 @@ import shutil
 import shlex
 import os
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MaelstromInvoker")
 
 
@@ -21,6 +21,9 @@ Currently, the following challenges are implemented:
 - 02: Unique ID Generation
 - 03a: Broadcast (Single Node)
 - 03b: Broadcast (Multi-Node)
+- 03c: Broadcast (Multi-Node Fault-tolerant)
+- 03d: Broadcast (Multi-Node Efficient 1)
+- 03e: Broadcast (Multi-Node Efficient 2)
 
 '''
 
@@ -30,15 +33,23 @@ IMPLEMENTED_CHALLENGES = {
     "2": "Unique ID Generation", 
     "3a": "Broadcast (Single Node)",
     "3b": "Broadcast (Multi-Node)",
-    # "3c": "Broadcast (Fault Tolerant)"
+    "3c": "Broadcast (Fault Tolerant)",
+    "3d": "Broadcast (Efficient 1)",
+    "3e": "Broadcast (Efficient 2)",
+    "4": "Grow only counter",
+    "5a": "Kafka style log (Single Node)"
 }
 
 CHALLENGE_COMMANDS = {
-    "1": "./maelstrom test -w echo --bin solutions/01-echo --time-limit 5",
-    "2": "./maelstrom test -w unique-ids --bin solutions/02-unique-id-generation --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition",
-    "3a": "./maelstrom test -w broadcast --bin solutions/03a-broadcast-single-node --node-count 1 --time-limit 20 --rate 10",
-    "3b": "./maelstrom test -w broadcast --bin solutions/03b-broadcast-multi-node --node-count 5 --time-limit 20 --rate 10",
-    # "3c": "./maelstrom test -w broadcast --bin solutions/03c-broadcast-fault-tolerant --node-count 5 --time-limit 20 --rate 10 --nemesis partition",
+    "1": "./maelstrom test -w echo --bin solutions/maelstrom-echo --time-limit 5",
+    "2": "./maelstrom test -w unique-ids --bin solutions/maelstrom-unique-id-generation --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition",
+    "3a": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-single-node --node-count 1 --time-limit 20 --rate 10",
+    "3b": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-multi-node --node-count 5 --time-limit 100 --rate 10",
+    "3c": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-fault-tolerant --node-count 5 --time-limit 20 --rate 10 --nemesis partition",
+    "3d": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-efficient-part-1 --node-count 25 --time-limit 20 --rate 100 --latency 100",
+    "3e": "./maelstrom test -w broadcast --bin solutions/maelstrom-broadcast-efficient-part-2 --node-count 25 --time-limit 20 --rate 100 --latency 100",
+    "4": "./maelstrom test -w g-counter --bin solutions/maelstrom-grow-only-counter --node-count 3 --rate 100 --time-limit 20 --nemesis partition",
+    "5a": "./maelstrom test -w kafka --bin solutions/maelstrom-kafka-part-1 --node-count 1 --concurrency 2n --time-limit 20 --rate 1000"
 }
 
 def parse_args():
@@ -49,6 +60,14 @@ def parse_args():
         nargs="+",
         type=str,
         help="The ids of the challenges to run.",
+    )
+    parser.add_argument(
+        "-l",
+        "--language",
+        type=str,
+        choices=("go", "rust"),
+        default="rust",
+        help="The implementation to run the tests for. Defaults to 'rust'."
     )
 
     args = parser.parse_args()
@@ -66,27 +85,28 @@ def inv(command, check=True, *args, **kwargs):
     return subprocess.run(shlex.split(command), check=True, *args, **kwargs)
 
 
-def build_binaries():
-    return inv("cargo build --release", cwd="solutions-rust")
+def build_and_copy_binaries(language: str = "rust"):
+    """Build the binaries for the given language."""
+    if language == "rust":
+        inv("cargo build --release", cwd="solutions-rust")
+        inv("mkdir -p maelstrom/solutions/rust")
+
+        SRC_DIR = "solutions-rust/target/release"
+        DEST_DIR = "maelstrom/solutions/rust"
+        
+        for file_path in os.listdir(SRC_DIR):
+            src_file_path = os.path.join(SRC_DIR, file_path)
+            # Copy over all the executables.
+
+            if os.path.isfile(src_file_path) and os.access(src_file_path, os.X_OK):
+                dest_file_path = os.path.join(DEST_DIR, file_path)
+                shutil.copy(src_file_path, dest_file_path)
+                logging.debug("Copied %s to %s", src_file_path, dest_file_path)
+    elif language == "go":
+        return inv("make all -j12", cwd="./solutions-go")
 
 
-def copy_binaries_to_maelstrom_solutions():
-    """Copy over the generated Rust binaries to maelstrom's solutions directory."""
-
-    SRC_DIR = "solutions-rust/target/release"
-    DEST_DIR = "maelstrom/solutions"
-
-    for file_path in os.listdir(SRC_DIR):
-        src_file_path = os.path.join(SRC_DIR, file_path)
-        # Copy over all the executables.
-
-        if os.path.isfile(src_file_path) and os.access(src_file_path, os.X_OK):
-            dest_file_path = os.path.join(DEST_DIR, file_path)
-            shutil.copy(src_file_path, dest_file_path)
-            logging.debug("Copied %s to %s", src_file_path, dest_file_path)
-
-
-def run_test(challenge: str):
+def run_test(challenge: str, lang: str):
     """Run maelstrom for a given challenge."""
 
     command = CHALLENGE_COMMANDS.get(challenge, None)
@@ -94,8 +114,11 @@ def run_test(challenge: str):
     if command is None:
         raise ValueError(f"Couldn't find a test for challenge: {str(challenge)}")
 
+    command = command.replace("solutions/", f"solutions/{lang}/")
+
     logger.info(
-        'Running maelstrom test for challenge "%s" (id: %s)',
+        'Running maelstrom test for %s implementation of challenge "%s" (id: %s)',
+        lang,
         IMPLEMENTED_CHALLENGES[challenge],
         challenge,
     )
@@ -122,12 +145,11 @@ def try_setup_maelstrom():
 
 def main():
     args = parse_args()
-    logger.info("Arguments: %s", args)
+    logger.debug("Arguments: %s", args)
     try_setup_maelstrom()
-    build_binaries()
-    copy_binaries_to_maelstrom_solutions()
+    build_and_copy_binaries(args.language)
     for challenge_id in args.challenge:
-        run_test(challenge_id)
+        run_test(challenge_id, args.language)
 
 
 if __name__ == "__main__":
